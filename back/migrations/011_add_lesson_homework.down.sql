@@ -1,0 +1,2 @@
+ALTER TABLE lessons
+DROP COLUMN IF EXISTS homework;

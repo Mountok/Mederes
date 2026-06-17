@@ -1,0 +1,2 @@
+docker exec -t 1c017ff4d5ce pg_dump -U postgres -d medrese -F c > backup.dump
+cat backup.dump | docker exec -i postgres_container pg_restore -U postgres -d my_database -c

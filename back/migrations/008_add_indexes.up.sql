@@ -1,0 +1,9 @@
+CREATE INDEX IF NOT EXISTS idx_users_school_id ON users (school_id);
+CREATE INDEX IF NOT EXISTS idx_groups_school_id ON groups (school_id);
+CREATE INDEX IF NOT EXISTS idx_students_group_id ON students (group_id);
+CREATE INDEX IF NOT EXISTS idx_students_school_id ON students (school_id);
+CREATE INDEX IF NOT EXISTS idx_lessons_group_id ON lessons (group_id);
+CREATE INDEX IF NOT EXISTS idx_lessons_school_id ON lessons (school_id);
+CREATE INDEX IF NOT EXISTS idx_attendance_lesson_id ON attendance (lesson_id);
+CREATE INDEX IF NOT EXISTS idx_attendance_student_id ON attendance (student_id);
+CREATE INDEX IF NOT EXISTS idx_attendance_school_id ON attendance (school_id);

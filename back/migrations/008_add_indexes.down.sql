@@ -1,0 +1,9 @@
+DROP INDEX IF EXISTS idx_attendance_school_id;
+DROP INDEX IF EXISTS idx_attendance_student_id;
+DROP INDEX IF EXISTS idx_attendance_lesson_id;
+DROP INDEX IF EXISTS idx_lessons_school_id;
+DROP INDEX IF EXISTS idx_lessons_group_id;
+DROP INDEX IF EXISTS idx_students_school_id;
+DROP INDEX IF EXISTS idx_students_group_id;
+DROP INDEX IF EXISTS idx_groups_school_id;
+DROP INDEX IF EXISTS idx_users_school_id;
