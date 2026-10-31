@@ -31,6 +31,17 @@ LOCAL_ORIGINS = {
 }
 
 
+def is_loopback_origin(origin):
+    try:
+        parsed = urlsplit(origin)
+        return (parsed.scheme in {"http", "https"}
+                and parsed.hostname in {"localhost", "127.0.0.1", "::1"}
+                and parsed.port != 0
+                and not (parsed.username or parsed.password or parsed.path or parsed.query or parsed.fragment))
+    except ValueError:
+        return False
+
+
 def merge_live_text(previous, current):
     """Replace the unstable tail where adjacent ASR windows share a phrase."""
     old, new = previous.split(), current.split()
@@ -93,7 +104,7 @@ def handler_for(
                 self.reply(404, {"error": "Не найдено."})
                 return
             origin = self.headers.get("Origin")
-            if (origin and origin not in permitted_origins) or self.headers.get("X-Al-Qalam-Test") != "1":
+            if (origin and origin not in permitted_origins and not is_loopback_origin(origin)) or self.headers.get("X-Al-Qalam-Test") != "1":
                 self.reply(403, {"error": "Доступ запрещён для этого источника."})
                 return
             try:

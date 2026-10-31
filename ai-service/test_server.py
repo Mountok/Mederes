@@ -60,6 +60,12 @@ class ApiTests(unittest.TestCase):
     def test_reject_foreign_origin(self):
         self.assertEqual(self.request(headers={"X-Al-Qalam-Test": "1", "Origin": "https://example.org"})[0], 403)
 
+    def test_permits_local_vite_origin(self):
+        self.assertEqual(self.request(headers={"X-Al-Qalam-Test": "1", "Origin": "http://127.0.0.1:5173"})[0], 200)
+
+    def test_rejects_lookalike_local_origin(self):
+        self.assertEqual(self.request(headers={"X-Al-Qalam-Test": "1", "Origin": "http://127.0.0.1.evil.example:5173"})[0], 403)
+
     def test_permits_configured_origin(self):
         self.server.shutdown()
         self.server.server_close()
