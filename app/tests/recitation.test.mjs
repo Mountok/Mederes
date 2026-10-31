@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import { runInNewContext } from 'node:vm'
 import { setImmediate as tick } from 'node:timers/promises'
 import { wavBlob, wavWindowBlob, latestQueue } from '../src/audio/pcm.js'
-import { combineResults } from '../src/audio/liveTracking.js'
+import { combineResults, retainConfirmedWords } from '../src/audio/liveTracking.js'
 
 test('PCM encoder produces mono PCM16 WAV with bounded samples', async () => {
   const blob = wavBlob([new Float32Array([-2, 0, 2]), new Float32Array([.5])], 48000)
@@ -31,6 +31,25 @@ test('confirmation replaces preliminary words without removing newer progress', 
   assert.deepEqual(result.tracking.words.map(item => item.state), ['review', 'matched', 'matched'])
   assert.equal(result.tracking.reached, 3)
   assert.equal(result.confirmed_model, 'base')
+})
+
+test('weak preliminary words from base add yellow progress without green confirmation', () => {
+  const word = state => ({ state })
+  const preview = { tracking: { words: [word('tentative'), word('pending')], reached: 1, aligned: false, low_confidence: true } }
+  const confirmed = { tracking: { words: [word('pending'), word('tentative')], reached: 2, aligned: false, low_confidence: true } }
+  const result = combineResults(preview, confirmed)
+  assert.deepEqual(result.tracking.words.map(item => item.state), ['tentative', 'tentative'])
+  assert.equal(result.tracking.matched, 0)
+  assert.equal(result.tracking.low_confidence, true)
+})
+
+test('a weak final pass keeps previously confirmed green words marked provisional', () => {
+  const confirmed = { tracking: { words: [{ state: 'matched' }], reached: 1, aligned: true, final: false } }
+  const final = { tracking: { words: [{ state: 'tentative' }], reached: 1, aligned: false, final: true } }
+  const result = retainConfirmedWords(final, null, confirmed)
+  assert.equal(result.tracking.words[0].state, 'matched')
+  assert.equal(result.final_fallback, true)
+  assert.equal(result.tracking.final, false)
 })
 
 test('queue keeps only the newest snapshot and preserves the final request', async () => {

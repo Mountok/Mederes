@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { latestQueue, wavBlob, wavWindowBlob } from './pcm.js'
-import { combineResults } from './liveTracking.js'
+import { combineResults, retainConfirmedWords } from './liveTracking.js'
 
 const LIVE_INTERVAL_SECONDS = 4
 const LIVE_WINDOW_SECONDS = 12
@@ -107,7 +107,7 @@ export default function useLiveRecitation(selection) {
           }
           if (!data?.tracking) throw new Error('Перезапустите AI-сервис: нужна обновлённая версия.')
           if (!run.closed && (final || !run.stopping)) {
-            if (final) setResult(data)
+            if (final) setResult(retainConfirmedWords(data, run.previewResult, run.confirmResult))
             else {
               if (confirm) run.confirmResult = data
               else run.previewResult = data

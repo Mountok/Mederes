@@ -128,7 +128,7 @@ export default function AiTestPage() {
     setUploaded(null); setUploadError('')
     void live.start()
   }
-  const status = loading ? 'Проверяем запись' : live.phase === 'requesting' ? 'Подключаем микрофон' : live.phase === 'finishing' ? 'Завершаем проверку' : live.phase === 'listening' ? (live.processing ? 'Обновляем подсветку' : 'Слушаем') : tracking ? (!tracking.aligned ? 'Не удалось сопоставить чтение' : !tracking.final ? 'Обновляем подсветку' : tracking.reviewed ? 'Проверьте выделенные слова' : tracking.complete ? 'Чтение завершено' : 'Диапазон прочитан не полностью') : ''
+  const status = loading ? 'Проверяем запись' : live.phase === 'requesting' ? 'Подключаем микрофон' : live.phase === 'finishing' ? 'Завершаем проверку' : live.phase === 'listening' ? (live.processing ? 'Обновляем подсветку' : 'Слушаем') : tracking ? (result.final_fallback ? 'Предварительная подсветка — финал требует проверки' : tracking.low_confidence ? 'Найдены отдельные слова — проверьте чтение' : !tracking.aligned ? 'Не удалось сопоставить чтение' : !tracking.final ? 'Обновляем подсветку' : tracking.reviewed ? 'Проверьте выделенные слова' : tracking.complete ? 'Чтение завершено' : 'Диапазон прочитан не полностью') : ''
   let index = 0
   return (
     <div className="recitation-page">

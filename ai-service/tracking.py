@@ -4,6 +4,29 @@ from analysis import AYAHS, BASMALA, normalize
 OPENINGS = ["أعوذ بالله من الشيطان الرجيم", BASMALA]
 
 
+def tentative_matches(reference, heard):
+    """Ordered exact anchors for weak ASR output; never used to confirm words."""
+    n, m = len(reference), len(heard)
+    lengths = [[0] * (m + 1) for _ in range(n + 1)]
+    for i in range(n - 1, -1, -1):
+        for j in range(m - 1, -1, -1):
+            lengths[i][j] = (1 + lengths[i + 1][j + 1] if reference[i] == heard[j]
+                             else max(lengths[i + 1][j], lengths[i][j + 1]))
+    i = j = 0
+    pairs = []
+    while i < n and j < m:
+        if reference[i] == heard[j]:
+            pairs.append((i, j))
+            i += 1
+            j += 1
+        elif lengths[i + 1][j] >= lengths[i][j + 1]:
+            i += 1
+        else:
+            j += 1
+    # A lone generic word (e.g. "الله") is not enough to locate a passage.
+    return pairs if len(pairs) >= 2 or pairs == [(0, 0)] else []
+
+
 def track(text, final=False, ayahs=None, ayah_from=1):
     ayahs = AYAHS if ayahs is None else ayahs
     if not ayahs:
@@ -54,6 +77,12 @@ def track(text, final=False, ayahs=None, ayah_from=1):
             j -= 1
     # Don't turn arbitrary speech or an isolated repeated word into progress.
     if matches < 2 or matches / max(m, end, 1) < 0.45:
+        candidates = tentative_matches(ref, heard)
+        if candidates:
+            for index, heard_index in candidates:
+                states[index].update(state="tentative", heard=heard[heard_index])
+            return dict(empty, words=states, reached=candidates[-1][0] + 1,
+                        low_confidence=True, tentative_count=len(candidates))
         return empty
     for index, state, observed in reversed(edits):
         if states[index]["state"] != "review":

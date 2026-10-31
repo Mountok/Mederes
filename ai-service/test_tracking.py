@@ -26,6 +26,23 @@ class TrackingTests(unittest.TestCase):
     def test_unrelated(self):
         self.assertFalse(track("شكرا لكم على المشاهدة")["aligned"])
 
+    def test_weak_asr_shows_only_tentative_exact_anchors(self):
+        text = "اللَّهُ وَهَتَّقَ اللَّهُ السَّمَتَّ لَمَّنٍ وَلَمَّنْ يُولَتْ وَلَمَّنْ يَكُنْ لَاهُ كُفُرًا عَدْنٍ"
+        result = track(text, final=True)
+        self.assertFalse(result["aligned"])
+        self.assertTrue(result["low_confidence"])
+        self.assertEqual(result["matched"], 0)
+        self.assertGreaterEqual(result["tentative_count"], 2)
+        self.assertTrue(all(word["state"] in {"pending", "tentative"} for word in result["words"]))
+
+    def test_first_word_can_be_tentative_before_more_audio_arrives(self):
+        result = track("قل والله")
+        self.assertEqual(result["words"][0]["state"], "tentative")
+
+    def test_isolated_generic_word_stays_gray(self):
+        result = track("الله")
+        self.assertTrue(all(word["state"] == "pending" for word in result["words"]))
+
     def test_middle_omission(self):
         words = normalize(" ".join(AYAHS)).split()
         del words[2]
