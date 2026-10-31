@@ -1,0 +1,62 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { runInNewContext } from 'node:vm'
+import { setImmediate as tick } from 'node:timers/promises'
+import { wavBlob, wavWindowBlob, latestQueue } from '../src/audio/pcm.js'
+
+test('PCM encoder produces mono PCM16 WAV with bounded samples', async () => {
+  const blob = wavBlob([new Float32Array([-2, 0, 2]), new Float32Array([.5])], 48000)
+  const data = new DataView(await blob.arrayBuffer())
+  assert.equal(blob.size, 52)
+  assert.equal(data.getUint32(24, true), 48000)
+  assert.equal(data.getUint32(40, true), 8)
+  assert.equal(data.getInt16(44, true), -32768)
+  assert.equal(data.getInt16(48, true), 32767)
+})
+
+test('live window contains only the latest samples', async () => {
+  const blob = wavWindowBlob([new Float32Array([.1, .2]), new Float32Array([.3, .4])], 2, 1)
+  const data = new DataView(await blob.arrayBuffer())
+  assert.equal(data.getUint32(40, true), 4)
+  assert.equal(data.getInt16(44, true), Math.round(.3 * 32767))
+})
+
+test('queue keeps only the newest snapshot and preserves the final request', async () => {
+  const calls = []
+  let release
+  const queue = latestQueue(async item => {
+    calls.push(item)
+    if (item === 'first') await new Promise(resolve => { release = resolve })
+  })
+  queue.push('first'); queue.push('obsolete'); queue.push('final')
+  assert.deepEqual(calls, ['first'])
+  release(); await tick()
+  assert.deepEqual(calls, ['first', 'final'])
+})
+
+test('closed queue drops pending work', async () => {
+  const calls = []
+  let release
+  const queue = latestQueue(async item => { calls.push(item); await new Promise(resolve => { release = resolve }) })
+  queue.push('first'); queue.push('pending'); queue.close(); release(); await tick()
+  queue.push('later')
+  assert.deepEqual(calls, ['first'])
+})
+
+test('audio worklet flushes the final partial buffer', () => {
+  let Processor
+  const messages = []
+  runInNewContext(readFileSync(new URL('../public/recitation-capture.js', import.meta.url), 'utf8'), {
+    AudioWorkletProcessor: class { constructor() { this.port = { postMessage: value => messages.push(value) } } },
+    registerProcessor: (_name, implementation) => { Processor = implementation },
+    Float32Array,
+  })
+  const processor = new Processor()
+  processor.process([[new Float32Array(128).fill(.25)]])
+  assert.equal(messages.length, 0)
+  processor.port.onmessage({ data: 'flush' })
+  assert.equal(messages[0].samples.length, 128)
+  assert.equal(messages[0].samples[0], .25)
+  assert.equal(messages[1].type, 'flushed')
+})

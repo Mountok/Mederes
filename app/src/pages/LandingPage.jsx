@@ -1,202 +1,30 @@
-import {
-  FiArrowRight,
-  FiBookOpen,
-  FiCheckSquare,
-  FiHome,
-  FiLogIn,
-  FiShield,
-  FiUsers,
-} from 'react-icons/fi'
+import { FiArrowRight, FiBookOpen, FiCheckCircle, FiHeadphones, FiHome, FiLogIn, FiUsers } from 'react-icons/fi'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth.jsx'
 
-const BENEFITS = [
-  {
-    icon: FiBookOpen,
-    title: 'Для учителей',
-    description: 'Ведите группы, уроки, посещаемость и баллы в одном рабочем месте.',
-  },
-  {
-    icon: FiUsers,
-    title: 'Для родителей',
-    description: 'Смотрите только важное: посещаемость, баллы и прогресс ребёнка.',
-  },
-  {
-    icon: FiHome,
-    title: 'Для медресе',
-    description: 'Держите учебный процесс в порядке без сложных таблиц и лишней рутины.',
-  },
+const FEATURES = [
+  { icon: FiUsers, title: 'Группы и ученики', description: 'Занятия, преподаватели и учебные группы в одном месте.' },
+  { icon: FiCheckCircle, title: 'Электронный журнал', description: 'Посещаемость, оценки и домашние задания.' },
+  { icon: FiBookOpen, title: 'Коран', description: '114 сур, перевод и прослушивание по аятам.' },
+  { icon: FiHome, title: 'Личный кабинет', description: 'Всё нужное для преподавателя, ученика и родителя.' },
 ]
 
-const STEPS = [
-  'Создайте группы и добавьте учеников.',
-  'Проводите уроки и отмечайте посещаемость.',
-  'Родители видят результаты без лишних действий.',
-]
-
-function LandingPage() {
+export default function LandingPage() {
   const { user } = useAuth()
-  const primaryHref = user ? '/groups' : '/login'
-  const primaryLabel = user ? 'Открыть журнал' : 'Войти'
-
-  return (
-    <div className="landing-shell">
-      <header className="landing-header">
-        <Link className="brand-block" to="/">
-          <div className="brand-mark">
-            <img src="/logo_al-qalam.png" alt="" aria-hidden="true" />
-          </div>
-          <div className="brand-copy">
-            <h1>Al-Qalam</h1>
-            <p>Электронный журнал для медресе</p>
-          </div>
-        </Link>
-
-        <nav className="landing-nav" aria-label="Навигация по странице">
-          <a className="nav-link" href="#benefits">
-            Возможности
-          </a>
-          <a className="nav-link" href="#workflow">
-            Как это работает
-          </a>
-          <Link className="button button-secondary" to={primaryHref}>
-            <FiLogIn />
-            {primaryLabel}
-          </Link>
-        </nav>
-      </header>
-
-      <main className="landing-main">
-        <section className="landing-hero">
-          <div className="landing-copy">
-            <span className="landing-kicker">Простой журнал для учителей и родителей</span>
-            <h2>Электронный журнал для медресе</h2>
-            <p>
-              Al-Qalam помогает быстро вести занятия, отмечать посещаемость и
-              открывать родителям только нужную информацию.
-            </p>
-
-            <div className="hero-actions">
-              <Link className="button button-primary" to={primaryHref}>
-                {primaryLabel}
-              </Link>
-              <a className="button button-ghost" href="#benefits">
-                Узнать больше
-                <FiArrowRight />
-              </a>
-            </div>
-
-            <div className="landing-points">
-              <span>
-                <FiShield />
-                Быстро и понятно
-              </span>
-              <span>
-                <FiCheckSquare />
-                Учёт за один экран
-              </span>
-              <span>
-                <FiUsers />
-                Отдельный режим для родителей
-              </span>
-            </div>
-          </div>
-
-          <div className="preview-card" aria-hidden="true">
-            <div className="preview-topbar">
-              <div className="preview-brand">
-                <div className="preview-dot" />
-                <strong>Журнал</strong>
-              </div>
-              <span className="preview-badge">Сегодня</span>
-            </div>
-
-            <div className="preview-columns">
-              <div className="preview-panel">
-                <h3>Группы</h3>
-                <div className="preview-item">
-                  <strong>Тафсир</strong>
-                  <span>18 учеников</span>
-                </div>
-                <div className="preview-item">
-                  <strong>Хифз</strong>
-                  <span>14 учеников</span>
-                </div>
-                <div className="preview-item">
-                  <strong>Фикх</strong>
-                  <span>11 учеников</span>
-                </div>
-              </div>
-
-              <div className="preview-panel">
-                <h3>Урок</h3>
-                <div className="preview-row">
-                  <span>Ахмад</span>
-                  <span className="preview-status success">Был</span>
-                  <span>5</span>
-                </div>
-                <div className="preview-row">
-                  <span>Иса</span>
-                  <span className="preview-status danger">Не был</span>
-                  <span>4</span>
-                </div>
-                <div className="preview-row">
-                  <span>Юсуф</span>
-                  <span className="preview-status success">Был</span>
-                  <span>5</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="landing-section" id="benefits">
-          <div className="landing-section-head">
-            <h3>Зачем нужен журнал</h3>
-            <p>Только те функции, которые действительно помогают в ежедневной работе.</p>
-          </div>
-
-          <div className="benefit-grid">
-            {BENEFITS.map((benefit) => (
-              <article key={benefit.title} className="benefit-card">
-                <div className="benefit-icon">
-                  <benefit.icon />
-                </div>
-                <h4>{benefit.title}</h4>
-                <p>{benefit.description}</p>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section className="landing-section" id="workflow">
-          <div className="landing-section-head">
-            <h3>Как это работает</h3>
-            <p>Сценарий построен так, чтобы преподаватель тратил минимум времени.</p>
-          </div>
-
-          <div className="steps-grid">
-            {STEPS.map((step, index) => (
-              <article key={step} className="step-card">
-                <span className="step-index">0{index + 1}</span>
-                <p>{step}</p>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section className="landing-cta">
-          <div>
-            <h3>Готово для повседневной работы медресе</h3>
-            <p>Учитель быстро отмечает урок, а родитель видит результат без лишних действий.</p>
-          </div>
-          <Link className="button button-primary" to={primaryHref}>
-            {primaryLabel}
-          </Link>
-        </section>
-      </main>
-    </div>
-  )
+  const href = user ? '/groups' : '/login'
+  const label = user ? 'Открыть журнал' : 'Войти'
+  return <div className="landing-shell">
+    <header className="landing-header">
+      <Link className="brand-block" to="/"><div className="brand-mark"><img src="/logo_al-qalam.png" alt="" /></div><div className="brand-copy"><h1>Al-Qalam</h1><p>Учиться. Читать. Развиваться.</p></div></Link>
+      <nav className="landing-nav" aria-label="Основная навигация"><a className="nav-link" href="#product">Возможности</a><Link className="nav-link" to="/ai-test">Практика чтения</Link><Link className="button button-secondary" to={href}><FiLogIn />{label}</Link></nav>
+    </header>
+    <main className="landing-main">
+      <section className="landing-hero">
+        <div className="landing-copy"><h2>Ближе к знаниям.<br />Аят за аятом.</h2><p className="landing-lead">Коран, практика чтения и учебный журнал — в одном пространстве Al-Qalam.</p><div className="hero-actions"><Link className="button button-primary" to="/ai-test">Начать чтение<FiArrowRight /></Link><Link className="button button-ghost" to={href}>Учебный кабинет<FiArrowRight /></Link></div></div>
+        <Link className="ai-preview landing-reading-preview" to="/ai-test" aria-label="Открыть практику чтения суры Аль-Ихляс"><div className="ai-preview-head"><div><span className="eyebrow">Практика чтения</span><strong>Аль-Ихляс</strong></div><span className="landing-surah-index">112</span></div><p className="landing-preview-arabic" lang="ar" dir="rtl">قُلْ هُوَ اللَّهُ أَحَدٌ</p><div className="landing-preview-bottom"><span><FiHeadphones />Слушайте и читайте</span><FiArrowRight /></div></Link>
+      </section>
+      <section className="landing-section" id="product"><div className="landing-section-head"><h3>Всё для ваших занятий</h3></div><div className="benefit-grid product-grid">{FEATURES.map(feature => <article key={feature.title} className="benefit-card"><div className="benefit-icon"><feature.icon /></div><h4>{feature.title}</h4><p>{feature.description}</p></article>)}</div></section>
+      <section className="landing-cta" id="pilot"><div><h3>Время для чтения</h3><p>Послушайте аят и попробуйте прочитать самостоятельно.</p></div><Link className="button button-primary" to="/ai-test">Открыть практику<FiArrowRight /></Link></section>
+    </main>
+  </div>
 }
-
-export default LandingPage

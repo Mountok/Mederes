@@ -20,6 +20,7 @@ function Navbar() {
         </NavLink>
 
         <nav className="nav-links" aria-label="Основная навигация">
+          <NavLink className="nav-link" to="/ai-test">Практика чтения</NavLink>
           <NavLink className="nav-link" to="/groups">
             Группы
           </NavLink>

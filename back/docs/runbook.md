@@ -37,13 +37,13 @@ go version
 Backend:
 
 ```bash
-/Users/dashuev/Desktop/Медресе/back
+/Users/ruman/Documents/agre/Mederes/back
 ```
 
 Frontend:
 
 ```bash
-/Users/dashuev/Desktop/Медресе/app
+/Users/ruman/Documents/agre/Mederes/app
 ```
 
 ### На сервере
@@ -179,7 +179,7 @@ docker ps
 Из папки backend:
 
 ```bash
-cd /Users/dashuev/Desktop/Медресе/back
+cd /Users/ruman/Documents/agre/Mederes/back
 go run ./cmd/server
 ```
 
@@ -203,7 +203,7 @@ curl http://localhost:8000/health
 Из папки frontend:
 
 ```bash
-cd /Users/dashuev/Desktop/Медресе/app
+cd /Users/ruman/Documents/agre/Mederes/app
 npm run dev
 ```
 

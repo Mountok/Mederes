@@ -1,6 +1,7 @@
 import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import { useAuth } from './auth/useAuth.jsx'
 import Navbar from './components/Navbar.jsx'
+import AiTestPage from './pages/AiTestPage.jsx'
 import ForbiddenPage from './pages/ForbiddenPage.jsx'
 import GroupDetailsPage from './pages/GroupDetailsPage.jsx'
 import GroupJournalPage from './pages/GroupJournalPage.jsx'
@@ -39,6 +40,7 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />
+      <Route path="/ai-test" element={<AiTestPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/live/join" element={<LiveUnavailablePage />} />
       <Route path="/live/:id" element={<LiveUnavailablePage />} />

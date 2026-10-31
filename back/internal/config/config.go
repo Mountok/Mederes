@@ -3,6 +3,7 @@ package config
 import (
 	"bufio"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 )
 
 type Config struct {
+	AppHost       string
 	AppPort       string
 	AppEnv        string
 	DBHost        string
@@ -33,6 +35,7 @@ func Load() (Config, error) {
 	}
 
 	cfg := Config{
+		AppHost:       getenv("APP_HOST", "127.0.0.1"),
 		AppPort:       getenv("APP_PORT", "8000"),
 		AppEnv:        getenv("APP_ENV", "development"),
 		DBHost:        getenv("DB_HOST", "localhost"),
@@ -70,7 +73,7 @@ func (c Config) DatabaseDSN() string {
 
 func (c Config) HTTPServer(handler http.Handler) *http.Server {
 	return &http.Server{
-		Addr:              ":" + c.AppPort,
+		Addr:              net.JoinHostPort(c.AppHost, c.AppPort),
 		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       15 * time.Second,

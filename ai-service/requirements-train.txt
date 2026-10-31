@@ -1,0 +1,7 @@
+# Isolated experiment; do not install into the website's .venv.
+torch==2.8.0
+transformers==4.46.3
+peft==0.13.2
+numpy==1.26.4
+av==15.1.0
+safetensors==0.6.2

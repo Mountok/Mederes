@@ -27,3 +27,16 @@ dist-ssr/
 *.njsproj
 *.sln
 *.sw?
+
+# Local speech experiments and recordings
+.venv/
+tmp/
+output/
+bin/
+samples/
+ai-service/.venv/
+ai-service/.venv-train/
+ai-service/training-runs/
+ai-service/models/
+ai-service/results/
+__pycache__/
