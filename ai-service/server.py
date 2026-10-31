@@ -53,9 +53,12 @@ def handler_for(
     resolve_ayahs=get_ayah_range,
     model_name=None,
     recognize_live=None,
+    recognize_confirm=None,
+    preview_model_name=None,
     allowed_origins=None,
 ):
     lock = threading.Lock()
+    preview_lock = threading.Lock()
     sessions = {}
     sessions_lock = threading.Lock()
     final_waiting = threading.Event()
@@ -79,13 +82,14 @@ def handler_for(
 
         def do_GET(self):
             if self.path == "/ai-api/health":
-                self.reply(200, {"status": "ok", "mode": "local-test", "model": model_name})
+                self.reply(200, {"status": "ok", "mode": "local-test", "model": model_name,
+                                 "preview_model": preview_model_name or model_name})
             else:
                 self.reply(404, {"error": "Не найдено."})
 
         def do_POST(self):
             url = urlsplit(self.path)
-            if url.path not in {"/ai-api/analyze", "/ai-api/listen", "/ai-api/listen/final"}:
+            if url.path not in {"/ai-api/analyze", "/ai-api/listen", "/ai-api/confirm", "/ai-api/listen/final"}:
                 self.reply(404, {"error": "Не найдено."})
                 return
             origin = self.headers.get("Origin")
@@ -109,11 +113,12 @@ def handler_for(
                 self.reply(400, {"error": str(exc) or "Некорректный выбор суры."})
                 return
             final = url.path == "/ai-api/listen/final"
+            preview = url.path == "/ai-api/listen"
             if final:
                 final_waiting.set()
                 acquired = lock.acquire(timeout=45)
             else:
-                acquired = not final_waiting.is_set() and lock.acquire(blocking=False)
+                acquired = not final_waiting.is_set() and (preview_lock if preview else lock).acquire(blocking=False)
             if not acquired:
                 self.reply(429, {"error": "Сервис занят. Повторите чуть позже."})
                 if final:
@@ -133,15 +138,18 @@ def handler_for(
                         upload.write(chunk)
                         remaining -= len(chunk)
                     upload.flush()
-                    recognizer_for_request = recognize_live if url.path == "/ai-api/listen" and recognize_live else recognize
+                    recognizer_for_request = (
+                        recognize_live if preview and recognize_live else
+                        recognize_confirm if url.path == "/ai-api/confirm" and recognize_confirm else recognize
+                    )
                     result = recognizer_for_request(upload.name)
-                    if session_id and url.path == "/ai-api/listen":
+                    if session_id and url.path in {"/ai-api/listen", "/ai-api/confirm"}:
                         with sessions_lock:
                             now = time.monotonic()
                             for key, value in list(sessions.items()):
                                 if now - value["updated"] > 180:
                                     del sessions[key]
-                            state = sessions.setdefault(session_id, {"seq": -1, "text": "", "updated": now})
+                            state = sessions.setdefault((session_id, url.path), {"seq": -1, "text": "", "updated": now})
                             if sequence > state["seq"]:
                                 state["text"] = merge_live_text(state["text"], result["transcript"])
                                 state["seq"] = sequence
@@ -149,7 +157,8 @@ def handler_for(
                             result["transcript"] = state["text"]
                     elif session_id and final:
                         with sessions_lock:
-                            sessions.pop(session_id, None)
+                            sessions.pop((session_id, "/ai-api/listen"), None)
+                            sessions.pop((session_id, "/ai-api/confirm"), None)
                     result.update(compare(result["transcript"], ayahs=ayahs, ayah_from=ayah_from))
                     result["selection"] = {
                         "surah": surah,
@@ -172,7 +181,7 @@ def handler_for(
             except Exception:
                 self.reply(422, {"error": "Не удалось обработать аудио. Попробуйте MP3, WAV или M4A без повреждений."})
             finally:
-                lock.release()
+                (preview_lock if preview else lock).release()
                 if final:
                     final_waiting.clear()
 
@@ -194,9 +203,13 @@ if __name__ == "__main__":
     args = parser.parse_args()
     recognizer = Recognizer(args.model, beam_size=args.beam_size, vad=args.vad)
 
+    preview_path = Path(__file__).parent / "models/tarteel-faster-whisper-tiny"
+    preview = Recognizer(str(preview_path), beam_size=1) if all(
+        (preview_path / name).exists() for name in ("model.bin", "tokenizer.json")
+    ) else recognizer
+
     def recognize_live(path):
-        # Fast partial hints; the final result keeps the more careful beam size.
-        return recognizer.transcribe(path, beam_size=1)
+        return preview.transcribe(path, beam_size=1)
 
     server = ThreadingHTTPServer(
         ("127.0.0.1", args.port),
@@ -204,6 +217,8 @@ if __name__ == "__main__":
             recognizer.transcribe,
             model_name=recognizer.name,
             recognize_live=recognize_live,
+            recognize_confirm=recognizer.transcribe,
+            preview_model_name=preview.name,
             allowed_origins=LOCAL_ORIGINS | set(args.allowed_origin),
         ),
     )

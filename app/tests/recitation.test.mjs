@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 import { runInNewContext } from 'node:vm'
 import { setImmediate as tick } from 'node:timers/promises'
 import { wavBlob, wavWindowBlob, latestQueue } from '../src/audio/pcm.js'
+import { combineResults } from '../src/audio/liveTracking.js'
 
 test('PCM encoder produces mono PCM16 WAV with bounded samples', async () => {
   const blob = wavBlob([new Float32Array([-2, 0, 2]), new Float32Array([.5])], 48000)
@@ -20,6 +21,16 @@ test('live window contains only the latest samples', async () => {
   const data = new DataView(await blob.arrayBuffer())
   assert.equal(data.getUint32(40, true), 4)
   assert.equal(data.getInt16(44, true), Math.round(.3 * 32767))
+})
+
+test('confirmation replaces preliminary words without removing newer progress', () => {
+  const word = state => ({ state })
+  const preview = { tracking: { words: [word('matched'), word('tentative'), word('matched')], reached: 3, aligned: true } }
+  const confirmed = { model: 'base', tracking: { words: [word('review'), word('matched'), word('pending')], reached: 2, aligned: true } }
+  const result = combineResults(preview, confirmed)
+  assert.deepEqual(result.tracking.words.map(item => item.state), ['review', 'matched', 'matched'])
+  assert.equal(result.tracking.reached, 3)
+  assert.equal(result.confirmed_model, 'base')
 })
 
 test('queue keeps only the newest snapshot and preserves the final request', async () => {

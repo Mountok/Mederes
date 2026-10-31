@@ -44,6 +44,8 @@ class Recognizer:
         self.name = (
             "tarteel-ai/whisper-base-ar-quran-ct2-int8"
             if model_path.name == "tarteel-faster-whisper-base"
+            else "tarteel-ai/whisper-tiny-ar-quran-ct2-int8"
+            if model_path.name == "tarteel-faster-whisper-tiny"
             else model
         )
         self.beam_size, self.vad, self.threads = beam_size, vad, threads

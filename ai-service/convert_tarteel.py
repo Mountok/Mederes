@@ -1,4 +1,5 @@
-"""Convert the locally downloaded Tarteel checkpoint for faster-whisper."""
+"""Convert a locally downloaded Tarteel checkpoint for faster-whisper."""
+import argparse
 import sys
 from pathlib import Path
 
@@ -23,18 +24,21 @@ from ctranslate2.converters.transformers import main  # noqa: E402
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--size", choices=("tiny", "base"), default="base")
+    args = parser.parse_args()
     root = Path(__file__).parent
-    snapshots = list((root / "models/tarteel-hf/hub/models--tarteel-ai--whisper-base-ar-quran/snapshots").glob("*"))
+    snapshots = list((root / f"models/tarteel-hf/hub/models--tarteel-ai--whisper-{args.size}-ar-quran/snapshots").glob("*"))
     if len(snapshots) != 1:
-        raise SystemExit("Сначала скачайте один checkpoint tarteel-ai/whisper-base-ar-quran.")
+        raise SystemExit(f"Сначала скачайте один checkpoint tarteel-ai/whisper-{args.size}-ar-quran.")
     sys.argv = [
         "ct2-transformers-converter",
         "--model", str(snapshots[0]),
-        "--output_dir", str(root / "models/tarteel-faster-whisper-base"),
+        "--output_dir", str(root / f"models/tarteel-faster-whisper-{args.size}"),
         "--copy_files", "preprocessor_config.json",
         "--quantization", "int8",
         "--force",
     ]
     main()
     tokenizer = AutoTokenizer.from_pretrained(snapshots[0], use_fast=True, local_files_only=True)
-    tokenizer.save_pretrained(root / "models/tarteel-faster-whisper-base")
+    tokenizer.save_pretrained(root / f"models/tarteel-faster-whisper-{args.size}")

@@ -14,6 +14,7 @@ class ApiTests(unittest.TestCase):
     def setUp(self):
         self.paths = []
         self.live_paths = []
+        self.confirm_paths = []
         self.live_transcripts = []
         self.selections = []
         def recognize(path):
@@ -28,7 +29,12 @@ class ApiTests(unittest.TestCase):
         def recognize_live(path):
             self.live_paths.append(path)
             return {"transcript": self.live_transcripts.pop(0) if self.live_transcripts else "test", "differences": []}
-        self.server = ThreadingHTTPServer(("127.0.0.1", 0), handler_for(recognize, resolve_ayahs, recognize_live=recognize_live))
+        def recognize_confirm(path):
+            self.confirm_paths.append(path)
+            return {"transcript": "confirmed test", "differences": []}
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), handler_for(
+            recognize, resolve_ayahs, recognize_live=recognize_live,
+            recognize_confirm=recognize_confirm, preview_model_name="tiny"))
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
 
@@ -82,7 +88,9 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(self.request(body=b"", headers={"X-Al-Qalam-Test": "1", "Content-Length": str(MAX_BYTES + 1)})[0], 413)
 
     def test_health(self):
-        self.assertEqual(self.request(method="GET", path="/ai-api/health", body=None)[0], 200)
+        status, data = self.request(method="GET", path="/ai-api/health", body=None)
+        self.assertEqual(status, 200)
+        self.assertEqual(data["preview_model"], "tiny")
 
     def test_live_snapshot(self):
         status, data = self.request(path="/ai-api/listen")
@@ -90,6 +98,13 @@ class ApiTests(unittest.TestCase):
         self.assertFalse(data["tracking"]["final"])
         self.assertEqual(len(self.live_paths), 1)
         self.assertEqual(len(self.paths), 0)
+
+    def test_confirmation_uses_second_recognizer(self):
+        status, data = self.request(path="/ai-api/confirm?session=one&seq=1")
+        self.assertEqual(status, 200)
+        self.assertEqual(data["transcript"], "confirmed test")
+        self.assertEqual(len(self.confirm_paths), 1)
+        self.assertEqual(len(self.live_paths), 0)
 
     def test_live_session_joins_overlapping_windows(self):
         self.live_transcripts = ["قل هو الله أحد", "الله أحد الله الصمد"]

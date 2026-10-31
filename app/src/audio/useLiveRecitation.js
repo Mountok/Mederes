@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { latestQueue, wavBlob, wavWindowBlob } from './pcm.js'
+import { combineResults } from './liveTracking.js'
 
 const LIVE_INTERVAL_SECONDS = 4
 const LIVE_WINDOW_SECONDS = 12
+const CONFIRM_INTERVAL_SECONDS = 8
 const MIN_LIVE_AUDIO_SECONDS = 3
 
 export default function useLiveRecitation(selection) {
@@ -26,7 +28,8 @@ export default function useLiveRecitation(selection) {
     if (!run) return
     run.closed = true
     clearInterval(run.timer)
-    run.queue?.close(); run.controller?.abort()
+    run.queue?.close(); run.confirmQueue?.close(); run.controller?.abort()
+    run.controllers?.forEach(controller => controller.abort())
     run.stream?.getTracks().forEach(track => track.stop())
     run.source?.disconnect(); run.node?.disconnect()
     if (run.context && run.context.state !== 'closed') void run.context.close().catch(() => {})
@@ -54,12 +57,14 @@ export default function useLiveRecitation(selection) {
     run.node.disconnect(); void run.context.close().catch(() => {})
     const blob = wavBlob(run.chunks, run.rate)
     run.queue.close()
-    run.controller?.abort()
+    run.confirmQueue.close()
+    run.controllers.forEach(controller => controller.abort())
     void run.send({ blob, final: true })
   }
   async function start() {
     reset()
-    const run = { id: crypto.randomUUID(), chunks: [], samples: 0, closed: false, stopping: false, seq: 0 }
+    const run = { id: crypto.randomUUID(), chunks: [], samples: 0, closed: false, stopping: false,
+      seq: 0, confirmSeq: 0, controllers: new Set(), inflight: 0, previewResult: null, confirmResult: null }
     session.current = run
     setPhase('requesting')
     try {
@@ -82,14 +87,14 @@ export default function useLiveRecitation(selection) {
       run.rate = run.context.sampleRate
       run.source = run.context.createMediaStreamSource(stream)
       run.node = new AudioWorkletNode(run.context, 'recitation-capture', { channelCount: 1 })
-      run.send = async ({ blob, final, seq }) => {
+      run.send = async ({ blob, final, confirm, seq }) => {
         if (run.closed) return
-        setProcessing(true)
+        run.inflight += 1; setProcessing(true)
         const controller = new AbortController()
-        run.controller = controller
+        run.controllers.add(controller)
         const requestTimeout = setTimeout(() => controller.abort(), 90000)
         try {
-          const path = endpoint(`/ai-api/listen${final ? '/final' : ''}`)
+          const path = endpoint(final ? '/ai-api/listen/final' : confirm ? '/ai-api/confirm' : '/ai-api/listen')
           const url = seq === undefined ? path : `${path}&seq=${seq}`
           const response = await fetch(url, {
             method: 'POST', body: blob, signal: controller.signal,
@@ -101,16 +106,30 @@ export default function useLiveRecitation(selection) {
             throw new Error(data?.error || 'Не удалось связаться с AI-сервисом.')
           }
           if (!data?.tracking) throw new Error('Перезапустите AI-сервис: нужна обновлённая версия.')
-          if (!run.closed && (final || !run.stopping)) { setResult(data); setError('') }
+          if (!run.closed && (final || !run.stopping)) {
+            if (final) setResult(data)
+            else {
+              if (confirm) run.confirmResult = data
+              else run.previewResult = data
+              setResult(combineResults(run.previewResult, run.confirmResult))
+            }
+            setError('')
+          }
           if (final && !run.closed) setPhase('done')
         } catch (err) {
           if (!run.closed && (final || !run.stopping)) {
             setError(err.name === 'AbortError' ? 'Распознавание заняло слишком много времени.' : err.message)
             if (final) setPhase('done')
           }
-        } finally { clearTimeout(requestTimeout); if (!run.closed && run.controller === controller) setProcessing(false) }
+        } finally {
+          clearTimeout(requestTimeout)
+          run.controllers.delete(controller)
+          run.inflight -= 1
+          if (!run.closed) setProcessing(run.inflight > 0)
+        }
       }
       run.queue = latestQueue(run.send)
+      run.confirmQueue = latestQueue(run.send)
       run.node.port.onmessage = ({ data }) => {
         if (run.closed) return
         if (data.type === 'flushed') { run.flushed?.(); return }
@@ -133,6 +152,11 @@ export default function useLiveRecitation(selection) {
         if (elapsed - run.lastSent >= LIVE_INTERVAL_SECONDS && run.samples >= run.rate * MIN_LIVE_AUDIO_SECONDS) {
           run.lastSent = elapsed
           run.queue.push({ blob: wavWindowBlob(run.chunks, run.rate, LIVE_WINDOW_SECONDS), final: false, seq: ++run.seq })
+        }
+        if (elapsed - (run.lastConfirmed || 0) >= CONFIRM_INTERVAL_SECONDS && run.samples >= run.rate * MIN_LIVE_AUDIO_SECONDS) {
+          run.lastConfirmed = elapsed
+          run.confirmQueue.push({ blob: wavWindowBlob(run.chunks, run.rate, LIVE_WINDOW_SECONDS),
+            confirm: true, seq: ++run.confirmSeq })
         }
       }, 250)
       setPhase('listening')
