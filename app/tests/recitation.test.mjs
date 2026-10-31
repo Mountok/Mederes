@@ -50,6 +50,17 @@ test('weak final result keeps aligned provisional highlighting clearly marked', 
   assert.equal(result.tracking.final, false)
 })
 
+test('sparse tentative words from base extend the preview without claiming a match', () => {
+  const pending = { state: 'pending' }
+  const tentative = { state: 'tentative' }
+  const preview = { tracking: { words: [tentative, pending], aligned: false, low_confidence: true, reached: 1 } }
+  const confirmed = { tracking: { words: [pending, tentative], aligned: false, low_confidence: true, reached: 2 } }
+  const result = combineResults(preview, confirmed)
+  assert.deepEqual(result.tracking.words.map(word => word.state), ['tentative', 'tentative'])
+  assert.equal(result.tracking.low_confidence, true)
+  assert.equal(result.tracking.matched, 0)
+})
+
 test('queue keeps only the newest snapshot and preserves the final request', async () => {
   const calls = []
   let release

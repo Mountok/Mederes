@@ -4,6 +4,28 @@ from analysis import AYAHS, BASMALA, normalize
 OPENINGS = ["أعوذ بالله من الشيطان الرجيم", BASMALA]
 
 
+def sparse_matches(reference, heard):
+    """Find ordered exact words without treating other ASR output as errors."""
+    n, m = len(reference), len(heard)
+    lengths = [[0] * (m + 1) for _ in range(n + 1)]
+    for i in range(n - 1, -1, -1):
+        for j in range(m - 1, -1, -1):
+            lengths[i][j] = (1 + lengths[i + 1][j + 1] if reference[i] == heard[j]
+                             else max(lengths[i + 1][j], lengths[i][j + 1]))
+    i = j = 0
+    pairs = []
+    while i < n and j < m:
+        if reference[i] == heard[j]:
+            pairs.append((i, j))
+            i += 1
+            j += 1
+        elif lengths[i + 1][j] >= lengths[i][j + 1]:
+            i += 1
+        else:
+            j += 1
+    return pairs
+
+
 def track(text, final=False, ayahs=None, ayah_from=1):
     ayahs = AYAHS if ayahs is None else ayahs
     if not ayahs:
@@ -59,9 +81,18 @@ def track(text, final=False, ayahs=None, ayah_from=1):
         else:
             edits.append((max(0, i-1), "review", heard[j-1]))
             j -= 1
-    # Don't turn arbitrary speech or an isolated repeated word into progress.
+    # Sparse ASR matches can indicate position, but cannot confirm reading.
+    # Show them as tentative instead of turning the entire verse into an error.
     if matches < 2 or matches / max(m, end, 1) < 0.45:
-        return empty
+        candidates = sparse_matches(ref, heard)
+        if len(candidates) == 1 and candidates[0] != (0, 0):
+            return empty
+        for index, heard_index in candidates:
+            states[index].update(state="tentative", heard=heard[heard_index])
+        if not candidates:
+            return empty
+        return dict(empty, words=states, reached=candidates[-1][0] + 1, low_confidence=True,
+                    tentative_count=len(candidates))
     for index, state, observed in reversed(edits):
         if states[index]["state"] != "review":
             states[index].update(state=state, heard=observed)

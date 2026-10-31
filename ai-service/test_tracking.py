@@ -26,6 +26,20 @@ class TrackingTests(unittest.TestCase):
     def test_unrelated(self):
         self.assertFalse(track("شكرا لكم على المشاهدة")["aligned"])
 
+    def test_sparse_recognition_only_highlights_tentative_words(self):
+        text = "اللَّهُ أَعَتْهُ اللَّهُ السَّمَتْ لَهَمْ وَلِتْ وَلَمْ يُؤْذَتْ وَلَمِّكُ اللَّهُ كُفُرًا أَحَدٌ"
+        result = track(text, final=True)
+        self.assertFalse(result["aligned"])
+        self.assertTrue(result["low_confidence"])
+        self.assertEqual(result["matched"], 0)
+        self.assertGreaterEqual(sum(word["state"] == "tentative" for word in result["words"]), 3)
+        self.assertFalse(any(word["state"] in {"matched", "review"} for word in result["words"]))
+
+    def test_first_word_can_be_tentative_while_asr_is_still_short(self):
+        result = track("قُلْ وَاللَّهُ")
+        self.assertEqual(result["words"][0]["state"], "tentative")
+        self.assertFalse(result["aligned"])
+
     def test_middle_omission(self):
         words = normalize(" ".join(AYAHS)).split()
         del words[2]
