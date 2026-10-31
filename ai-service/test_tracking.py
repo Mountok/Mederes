@@ -47,6 +47,15 @@ class TrackingTests(unittest.TestCase):
         self.assertEqual(result["ayah_from"], 2)
         self.assertEqual(result["ayah_to"], 2)
 
+    def test_live_window_tolerates_imperfect_opening(self):
+        result = track("إسم الله الرحمن قل هم قل هو الله أحد")
+        self.assertTrue(result["aligned"])
+        self.assertGreaterEqual(result["matched"], 2)
+
+    def test_final_does_not_discard_words_before_selected_text(self):
+        result = track("كلام غير متعلق قل هو الله أحد", final=True)
+        self.assertGreater(result["reviewed"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()

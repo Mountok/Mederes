@@ -57,21 +57,21 @@ class Recognizer:
         return self.transcribe_audio(decode_limited(path), beam_size=beam_size)
 
     def transcribe_pcm16(self, pcm, sample_rate, beam_size=None):
+        import av
         import numpy as np
         if sample_rate < 8000 or sample_rate > 96000 or len(pcm) % 2:
             raise ValueError("Некорректный поток микрофона.")
-        source = np.frombuffer(pcm, dtype="<i2").astype(np.float32) / 32768
+        source = np.frombuffer(pcm, dtype="<i2")
         if len(source) > sample_rate * MAX_SECONDS:
             raise ValueError("Запись должна быть не длиннее 60 секунд.")
         if sample_rate == 16000:
-            audio = source
-        elif sample_rate % 16000 == 0:
-            factor = sample_rate // 16000
-            audio = source[:len(source) // factor * factor].reshape(-1, factor).mean(axis=1)
+            audio = source.astype(np.float32) / 32768
         else:
-            count = round(len(source) * 16000 / sample_rate)
-            audio = np.interp(np.arange(count) * sample_rate / 16000,
-                              np.arange(len(source)), source).astype(np.float32)
+            frame = av.AudioFrame.from_ndarray(source.reshape(1, -1), format="s16", layout="mono")
+            frame.sample_rate = sample_rate
+            resampler = av.AudioResampler(format="fltp", layout="mono", rate=16000)
+            outputs = resampler.resample(frame) + resampler.resample(None)
+            audio = np.concatenate([part.to_ndarray().reshape(-1) for part in outputs])
         return self.transcribe_audio(audio, beam_size=beam_size)
 
     def transcribe_audio(self, audio, beam_size=None):

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { combineResults } from './liveTracking.js'
+import { combineResults, keepAlignedProvisional } from './liveTracking.js'
 import { pcm16Buffer } from './pcm.js'
 
 export default function useLiveRecitation(selection) {
@@ -59,7 +59,9 @@ export default function useLiveRecitation(selection) {
     setPhase('requesting')
     try {
       if (!navigator.mediaDevices?.getUserMedia || !window.AudioContext || !window.AudioWorkletNode) throw new Error('Микрофон недоступен. Откройте сайт в Chrome или загрузите запись.')
-      run.stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true }, video: false })
+      run.stream = await navigator.mediaDevices.getUserMedia({ audio: {
+        channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: false,
+      }, video: false })
       if (run.closed) return
       run.context = new AudioContext()
       await run.context.audioWorklet.addModule('/recitation-capture.js')
@@ -102,7 +104,10 @@ export default function useLiveRecitation(selection) {
         if (message.type === 'error') {
           setError(message.error || 'Не удалось обработать запись.')
           setProcessing(false)
-          if (run.stopping) setPhase('done')
+          if (run.stopping) {
+            setResult(keepAlignedProvisional(null, run.preview, run.confirmed))
+            setPhase('done')
+          }
           else { dispose(run); setPhase('idle') }
           return
         }
@@ -120,7 +125,8 @@ export default function useLiveRecitation(selection) {
         }
         if (message.type === 'final') {
           clearTimeout(run.finalTimeout)
-          setResult(message.result); setPhase('done'); setProcessing(false); setError('')
+          setResult(keepAlignedProvisional(message.result, run.preview, run.confirmed))
+          setPhase('done'); setProcessing(false); setError('')
         }
       }
       run.socket.onerror = () => {

@@ -18,6 +18,13 @@ def track(text, final=False, ayahs=None, ayah_from=1):
             heard = heard[len(prefix):]
     display = [word for ayah in ayahs for word in ayah.split()]
     ref = normalize(" ".join(ayahs)).split()
+    # A short, imperfect basmala can precede the selected text in a live window.
+    # Only trim it when the first three reference words are heard in sequence.
+    if not final and len(ref) >= 3 and len(heard) >= 4:
+        for start in range(1, min(9, len(heard) - 2)):
+            if heard[start:start + 3] == ref[:3]:
+                heard = heard[start:]
+                break
     states = [dict(index=i, text=word, state="pending", heard=None) for i, word in enumerate(display)]
     empty = dict(words=states, matched=0, reviewed=0, reached=0, total=len(ref),
                  ayah_from=ayah_from, ayah_to=ayah_from + len(ayahs) - 1,

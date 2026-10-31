@@ -15,3 +15,9 @@ export function combineResults(preview, confirmed) {
   }
   return { ...preview, tracking, confirmed_model: confirmed.model }
 }
+
+export function keepAlignedProvisional(final, preview, confirmed) {
+  const provisional = combineResults(preview, confirmed)
+  if (final?.tracking?.aligned || !provisional?.tracking?.aligned) return final
+  return { ...provisional, final_fallback: true }
+}
