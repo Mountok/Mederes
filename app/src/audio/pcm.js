@@ -28,16 +28,6 @@ export function wavWindowBlob(chunks, sampleRate, seconds) {
   return wavBlob(tail, sampleRate)
 }
 
-export function pcm16Buffer(samples) {
-  const buffer = new ArrayBuffer(samples.length * 2)
-  const view = new DataView(buffer)
-  for (let index = 0; index < samples.length; index++) {
-    const sample = Math.max(-1, Math.min(1, samples[index]))
-    view.setInt16(index * 2, sample < 0 ? sample * 32768 : sample * 32767, true)
-  }
-  return buffer
-}
-
 // One request at a time; replace stale intermediate snapshots with the newest.
 export function latestQueue(worker) {
   let active = false, pending = null, closed = false

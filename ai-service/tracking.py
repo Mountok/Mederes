@@ -4,28 +4,6 @@ from analysis import AYAHS, BASMALA, normalize
 OPENINGS = ["أعوذ بالله من الشيطان الرجيم", BASMALA]
 
 
-def sparse_matches(reference, heard):
-    """Find ordered exact words without treating other ASR output as errors."""
-    n, m = len(reference), len(heard)
-    lengths = [[0] * (m + 1) for _ in range(n + 1)]
-    for i in range(n - 1, -1, -1):
-        for j in range(m - 1, -1, -1):
-            lengths[i][j] = (1 + lengths[i + 1][j + 1] if reference[i] == heard[j]
-                             else max(lengths[i + 1][j], lengths[i][j + 1]))
-    i = j = 0
-    pairs = []
-    while i < n and j < m:
-        if reference[i] == heard[j]:
-            pairs.append((i, j))
-            i += 1
-            j += 1
-        elif lengths[i + 1][j] >= lengths[i][j + 1]:
-            i += 1
-        else:
-            j += 1
-    return pairs
-
-
 def track(text, final=False, ayahs=None, ayah_from=1):
     ayahs = AYAHS if ayahs is None else ayahs
     if not ayahs:
@@ -40,13 +18,6 @@ def track(text, final=False, ayahs=None, ayah_from=1):
             heard = heard[len(prefix):]
     display = [word for ayah in ayahs for word in ayah.split()]
     ref = normalize(" ".join(ayahs)).split()
-    # A short, imperfect basmala can precede the selected text in a live window.
-    # Only trim it when the first three reference words are heard in sequence.
-    if not final and len(ref) >= 3 and len(heard) >= 4:
-        for start in range(1, min(9, len(heard) - 2)):
-            if heard[start:start + 3] == ref[:3]:
-                heard = heard[start:]
-                break
     states = [dict(index=i, text=word, state="pending", heard=None) for i, word in enumerate(display)]
     empty = dict(words=states, matched=0, reviewed=0, reached=0, total=len(ref),
                  ayah_from=ayah_from, ayah_to=ayah_from + len(ayahs) - 1,
@@ -81,18 +52,9 @@ def track(text, final=False, ayahs=None, ayah_from=1):
         else:
             edits.append((max(0, i-1), "review", heard[j-1]))
             j -= 1
-    # Sparse ASR matches can indicate position, but cannot confirm reading.
-    # Show them as tentative instead of turning the entire verse into an error.
+    # Don't turn arbitrary speech or an isolated repeated word into progress.
     if matches < 2 or matches / max(m, end, 1) < 0.45:
-        candidates = sparse_matches(ref, heard)
-        if len(candidates) == 1 and candidates[0] != (0, 0):
-            return empty
-        for index, heard_index in candidates:
-            states[index].update(state="tentative", heard=heard[heard_index])
-        if not candidates:
-            return empty
-        return dict(empty, words=states, reached=candidates[-1][0] + 1, low_confidence=True,
-                    tentative_count=len(candidates))
+        return empty
     for index, state, observed in reversed(edits):
         if states[index]["state"] != "review":
             states[index].update(state=state, heard=observed)

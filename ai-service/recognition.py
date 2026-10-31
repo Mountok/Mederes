@@ -54,36 +54,11 @@ class Recognizer:
                                   local_files_only=True)
 
     def transcribe(self, path, beam_size=None):
-        return self.transcribe_audio(decode_limited(path), beam_size=beam_size)
-
-    def transcribe_pcm16(self, pcm, sample_rate, beam_size=None):
-        import av
-        import numpy as np
-        if sample_rate < 8000 or sample_rate > 96000 or len(pcm) % 2:
-            raise ValueError("Некорректный поток микрофона.")
-        source = np.frombuffer(pcm, dtype="<i2")
-        if len(source) > sample_rate * MAX_SECONDS:
-            raise ValueError("Запись должна быть не длиннее 60 секунд.")
-        if sample_rate == 16000:
-            audio = source.astype(np.float32) / 32768
-        else:
-            frame = av.AudioFrame.from_ndarray(source.reshape(1, -1), format="s16", layout="mono")
-            frame.sample_rate = sample_rate
-            resampler = av.AudioResampler(format="fltp", layout="mono", rate=16000)
-            outputs = resampler.resample(frame) + resampler.resample(None)
-            audio = np.concatenate([part.to_ndarray().reshape(-1) for part in outputs])
-        return self.transcribe_audio(audio, beam_size=beam_size)
-
-    def transcribe_audio(self, audio, beam_size=None):
-        import numpy as np
         started = time.perf_counter()
         beam_size = self.beam_size if beam_size is None else beam_size
         if not 1 <= beam_size <= 10:
             raise ValueError("beam_size must be 1–10")
-        if len(audio) < 16000 or len(audio) > MAX_SECONDS * 16000 or not np.isfinite(audio).all():
-            raise ValueError("Запись должна длиться от 1 до 60 секунд.")
-        if np.max(np.abs(audio)) < 0.0001:
-            raise ValueError("В записи не обнаружен звук. Попробуйте другую запись.")
+        audio = decode_limited(path)
         segments, _ = self.model.transcribe(audio, language="ar", task="transcribe",
             beam_size=beam_size, temperature=0, condition_on_previous_text=False,
             vad_filter=self.vad, word_timestamps=False)
