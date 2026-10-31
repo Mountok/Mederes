@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { runInNewContext } from 'node:vm'
 import { setImmediate as tick } from 'node:timers/promises'
-import { wavBlob, wavWindowBlob, latestQueue } from '../src/audio/pcm.js'
+import { wavBlob, wavWindowBlob, latestQueue, pcm16Buffer } from '../src/audio/pcm.js'
 import { combineResults } from '../src/audio/liveTracking.js'
 
 test('PCM encoder produces mono PCM16 WAV with bounded samples', async () => {
@@ -14,6 +14,12 @@ test('PCM encoder produces mono PCM16 WAV with bounded samples', async () => {
   assert.equal(data.getUint32(40, true), 8)
   assert.equal(data.getInt16(44, true), -32768)
   assert.equal(data.getInt16(48, true), 32767)
+})
+
+test('WebSocket microphone frames contain little-endian PCM16', () => {
+  const view = new DataView(pcm16Buffer(new Float32Array([-2, 0, .5, 2])))
+  assert.deepEqual([0, 2, 4, 6].map(offset => view.getInt16(offset, true)),
+    [-32768, 0, Math.trunc(.5 * 32767), 32767])
 })
 
 test('live window contains only the latest samples', async () => {

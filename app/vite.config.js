@@ -6,6 +6,11 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
+      '/ai-stream': {
+        target: 'ws://127.0.0.1:8002',
+        changeOrigin: true,
+        ws: true,
+      },
       '/ai-api': {
         target: 'http://127.0.0.1:8001',
         changeOrigin: true,

@@ -200,9 +200,11 @@ def handler_for(
 
 
 if __name__ == "__main__":
+    import asyncio
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", default=DEFAULT_MODEL)
     parser.add_argument("--port", type=int, default=8001)
+    parser.add_argument("--stream-port", type=int, default=8002)
     parser.add_argument("--beam-size", type=int, default=5)
     parser.add_argument("--vad", action="store_true", help="Experimental pause filtering")
     parser.add_argument(
@@ -233,7 +235,15 @@ if __name__ == "__main__":
             allowed_origins=LOCAL_ORIGINS | set(args.allowed_origin),
         ),
     )
+    from stream_server import serve_stream
+    stream_thread = threading.Thread(
+        target=lambda: asyncio.run(serve_stream(preview, recognizer, args.stream_port,
+                                                LOCAL_ORIGINS | set(args.allowed_origin))),
+        daemon=True,
+    )
+    stream_thread.start()
     print(f"AI test API: http://127.0.0.1:{args.port} (local only); model={recognizer.name}", flush=True)
+    print(f"Microphone WebSocket: ws://127.0.0.1:{args.stream_port}/ai-stream", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

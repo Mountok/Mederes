@@ -45,6 +45,16 @@ class RecognitionTests(unittest.TestCase):
         self.assertEqual(result["transcript"], "اختبار مختلف")
         self.assertTrue(result["requires_teacher_review"])
 
+    def test_pcm16_microphone_resamples_without_reference_text(self):
+        obj = self.recognizer("قُلْ هُوَ اللَّهُ أَحَدٌ")
+        source = np.full(48000, 16384, dtype="<i2")
+        result = obj.transcribe_pcm16(source.tobytes(), 48000, beam_size=1)
+        self.assertEqual(result["duration_seconds"], 1)
+        self.assertEqual(result["recognition_settings"]["beam_size"], 1)
+        audio = obj.model.transcribe.call_args.args[0]
+        self.assertEqual(len(audio), 16000)
+        self.assertAlmostEqual(float(audio.mean()), .5, places=3)
+
 
 if __name__ == "__main__":
     unittest.main()

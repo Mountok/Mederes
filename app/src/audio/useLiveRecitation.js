@@ -1,11 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { latestQueue, wavBlob, wavWindowBlob } from './pcm.js'
 import { combineResults } from './liveTracking.js'
-
-const LIVE_INTERVAL_SECONDS = 4
-const LIVE_WINDOW_SECONDS = 12
-const CONFIRM_INTERVAL_SECONDS = 8
-const MIN_LIVE_AUDIO_SECONDS = 3
+import { pcm16Buffer } from './pcm.js'
 
 export default function useLiveRecitation(selection) {
   const [phase, setPhase] = useState('idle')
@@ -15,31 +10,26 @@ export default function useLiveRecitation(selection) {
   const [level, setLevel] = useState(0)
   const [processing, setProcessing] = useState(false)
   const session = useRef(null)
-  function endpoint(path) {
-    const query = new URLSearchParams({
-      surah: String(selection.surah),
-      ayah_from: String(selection.ayahFrom),
-      ayah_to: String(selection.ayahTo),
-      session: session.current?.id || '',
-    })
-    return `${path}?${query}`
-  }
+
   function dispose(run) {
     if (!run) return
     run.closed = true
     clearInterval(run.timer)
-    run.queue?.close(); run.confirmQueue?.close(); run.controller?.abort()
-    run.controllers?.forEach(controller => controller.abort())
+    clearTimeout(run.finalTimeout)
+    run.socket?.close()
     run.stream?.getTracks().forEach(track => track.stop())
-    run.source?.disconnect(); run.node?.disconnect()
+    run.source?.disconnect()
+    run.node?.disconnect()
     if (run.context && run.context.state !== 'closed') void run.context.close().catch(() => {})
   }
   useEffect(() => () => dispose(session.current), [])
+
   function reset() {
-    dispose(session.current); session.current = null
-    setPhase('idle'); setResult(null); setError(''); setSeconds(0); setLevel(0)
-    setProcessing(false)
+    dispose(session.current)
+    session.current = null
+    setPhase('idle'); setResult(null); setError(''); setSeconds(0); setLevel(0); setProcessing(false)
   }
+
   async function stop() {
     const run = session.current
     if (!run || run.closed || run.stopping || !run.node) return
@@ -47,123 +37,107 @@ export default function useLiveRecitation(selection) {
     clearInterval(run.timer)
     run.stream.getTracks().forEach(track => track.stop())
     run.source.disconnect()
-    setPhase('finishing'); setLevel(0)
+    setPhase('finishing'); setLevel(0); setProcessing(true)
     await new Promise(resolve => {
       const timeout = setTimeout(resolve, 1000)
       run.flushed = () => { clearTimeout(timeout); resolve() }
       run.node.port.postMessage('flush')
     })
     if (run.closed) return
-    run.node.disconnect(); void run.context.close().catch(() => {})
-    const blob = wavBlob(run.chunks, run.rate)
-    run.queue.close()
-    run.confirmQueue.close()
-    run.controllers.forEach(controller => controller.abort())
-    void run.send({ blob, final: true })
+    run.node.disconnect()
+    void run.context.close().catch(() => {})
+    if (run.socket.readyState === WebSocket.OPEN) run.socket.send(JSON.stringify({ type: 'stop' }))
+    run.finalTimeout = setTimeout(() => {
+      if (!run.closed) { setError('Проверка заняла слишком много времени. Попробуйте ещё раз.'); setPhase('done'); setProcessing(false); run.socket.close() }
+    }, 90000)
   }
+
   async function start() {
     reset()
-    const run = { id: crypto.randomUUID(), chunks: [], samples: 0, closed: false, stopping: false,
-      seq: 0, confirmSeq: 0, controllers: new Set(), inflight: 0, previewResult: null, confirmResult: null }
+    const run = { closed: false, stopping: false, preview: null, confirmed: null, previewSeq: 0, confirmSeq: 0 }
     session.current = run
     setPhase('requesting')
     try {
       if (!navigator.mediaDevices?.getUserMedia || !window.AudioContext || !window.AudioWorkletNode) throw new Error('Микрофон недоступен. Откройте сайт в Chrome или загрузите запись.')
-      run.controller = new AbortController()
-      const timeout = setTimeout(() => run.controller.abort(), 5000)
-      let health
-      try { health = await fetch('/ai-api/health', { signal: run.controller.signal }) }
-      finally { clearTimeout(timeout) }
-      if (!health.ok) throw new Error('Запустите локальный AI-сервис и попробуйте ещё раз.')
+      run.stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true }, video: false })
       if (run.closed) return
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true }, video: false })
-      if (run.closed) { stream.getTracks().forEach(track => track.stop()); return }
-      run.stream = stream
       run.context = new AudioContext()
       await run.context.audioWorklet.addModule('/recitation-capture.js')
       if (run.closed) return
       await run.context.resume()
-      if (run.closed) return
       run.rate = run.context.sampleRate
-      run.source = run.context.createMediaStreamSource(stream)
+      run.source = run.context.createMediaStreamSource(run.stream)
       run.node = new AudioWorkletNode(run.context, 'recitation-capture', { channelCount: 1 })
-      run.send = async ({ blob, final, confirm, seq }) => {
+      const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
+      run.socket = new WebSocket(`${protocol}//${location.host}/ai-stream`)
+      run.socket.binaryType = 'arraybuffer'
+      run.socket.onopen = () => run.socket.send(JSON.stringify({
+        type: 'start', surah: selection.surah, ayah_from: selection.ayahFrom,
+        ayah_to: selection.ayahTo, sample_rate: run.rate,
+      }))
+      run.socket.onmessage = ({ data }) => {
         if (run.closed) return
-        run.inflight += 1; setProcessing(true)
-        const controller = new AbortController()
-        run.controllers.add(controller)
-        const requestTimeout = setTimeout(() => controller.abort(), 90000)
-        try {
-          const path = endpoint(final ? '/ai-api/listen/final' : confirm ? '/ai-api/confirm' : '/ai-api/listen')
-          const url = seq === undefined ? path : `${path}&seq=${seq}`
-          const response = await fetch(url, {
-            method: 'POST', body: blob, signal: controller.signal,
-            headers: { 'Content-Type': 'audio/wav', 'X-Al-Qalam-Test': '1' },
-          })
-          const data = await response.json().catch(() => null)
-          if (!response.ok) {
-            if (!final && [422, 429].includes(response.status)) return
-            throw new Error(data?.error || 'Не удалось связаться с AI-сервисом.')
+        let message
+        try { message = JSON.parse(data) } catch { return }
+        if (message.type === 'ready') {
+          run.node.port.onmessage = ({ data: audio }) => {
+            if (run.closed) return
+            if (audio.type === 'flushed') { run.flushed?.(); return }
+            if (audio.type !== 'samples') return
+            const samples = audio.samples
+            if (run.socket.readyState === WebSocket.OPEN) run.socket.send(pcm16Buffer(samples))
+            if (!run.stopping) setLevel(Math.min(1, Math.sqrt(samples.reduce((sum, x) => sum + x*x, 0) / samples.length) * 8))
           }
-          if (!data?.tracking) throw new Error('Перезапустите AI-сервис: нужна обновлённая версия.')
-          if (!run.closed && (final || !run.stopping)) {
-            if (final) setResult(data)
-            else {
-              if (confirm) run.confirmResult = data
-              else run.previewResult = data
-              setResult(combineResults(run.previewResult, run.confirmResult))
-            }
-            setError('')
+          run.source.connect(run.node)
+          run.node.connect(run.context.destination)
+          run.started = performance.now()
+          run.timer = setInterval(() => {
+            const elapsed = (performance.now() - run.started) / 1000
+            setSeconds(Math.min(55, Math.floor(elapsed)))
+            if (elapsed >= 55) void stop()
+          }, 250)
+          setPhase('listening')
+          return
+        }
+        if (message.type === 'error') {
+          setError(message.error || 'Не удалось обработать запись.')
+          setProcessing(false)
+          if (run.stopping) setPhase('done')
+          else { dispose(run); setPhase('idle') }
+          return
+        }
+        if (message.type === 'preview' || message.type === 'confirm') {
+          if (run.stopping || !message.result?.tracking) return
+          if (message.type === 'preview' && message.seq > run.previewSeq) {
+            run.previewSeq = message.seq; run.preview = message.result
           }
-          if (final && !run.closed) setPhase('done')
-        } catch (err) {
-          if (!run.closed && (final || !run.stopping)) {
-            setError(err.name === 'AbortError' ? 'Распознавание заняло слишком много времени.' : err.message)
-            if (final) setPhase('done')
+          if (message.type === 'confirm' && message.seq > run.confirmSeq) {
+            run.confirmSeq = message.seq; run.confirmed = message.result
           }
-        } finally {
-          clearTimeout(requestTimeout)
-          run.controllers.delete(controller)
-          run.inflight -= 1
-          if (!run.closed) setProcessing(run.inflight > 0)
+          setResult(combineResults(run.preview, run.confirmed))
+          setError('')
+          return
+        }
+        if (message.type === 'final') {
+          clearTimeout(run.finalTimeout)
+          setResult(message.result); setPhase('done'); setProcessing(false); setError('')
         }
       }
-      run.queue = latestQueue(run.send)
-      run.confirmQueue = latestQueue(run.send)
-      run.node.port.onmessage = ({ data }) => {
-        if (run.closed) return
-        if (data.type === 'flushed') { run.flushed?.(); return }
-        if (data.type !== 'samples') return
-        const remaining = Math.max(0, 55 * run.rate - run.samples)
-        const samples = data.samples.subarray(0, remaining)
-        if (samples.length) {
-          run.chunks.push(samples); run.samples += samples.length
-          if (!run.stopping) setLevel(Math.min(1, Math.sqrt(samples.reduce((sum, x) => sum + x*x, 0) / samples.length) * 8))
-        }
-        if (!remaining && !run.stopping) void stop()
+      run.socket.onerror = () => {
+        if (!run.closed) setError('Не удалось связаться с AI-сервисом. Проверьте локальный запуск.')
       }
-      run.source.connect(run.node)
-      run.node.connect(run.context.destination) // Worklet outputs silence, not mic monitoring.
-      run.started = performance.now(); run.lastSent = 0
-      run.timer = setInterval(() => {
-        const elapsed = (performance.now() - run.started) / 1000
-        setSeconds(Math.min(55, Math.floor(elapsed)))
-        if (elapsed >= 55) { void stop(); return }
-        if (elapsed - run.lastSent >= LIVE_INTERVAL_SECONDS && run.samples >= run.rate * MIN_LIVE_AUDIO_SECONDS) {
-          run.lastSent = elapsed
-          run.queue.push({ blob: wavWindowBlob(run.chunks, run.rate, LIVE_WINDOW_SECONDS), final: false, seq: ++run.seq })
+      run.socket.onclose = () => {
+        if (run.closed) return
+        if (run.stopping) { setPhase('done'); setProcessing(false) }
+        else {
+          dispose(run); setPhase('idle')
+          setError(run.started ? 'Соединение с AI-сервисом прервалось. Начните чтение заново.' : 'AI-сервис недоступен. Запустите его и повторите.')
         }
-        if (elapsed - (run.lastConfirmed || 0) >= CONFIRM_INTERVAL_SECONDS && run.samples >= run.rate * MIN_LIVE_AUDIO_SECONDS) {
-          run.lastConfirmed = elapsed
-          run.confirmQueue.push({ blob: wavWindowBlob(run.chunks, run.rate, LIVE_WINDOW_SECONDS),
-            confirm: true, seq: ++run.confirmSeq })
-        }
-      }, 250)
-      setPhase('listening')
+      }
     } catch (err) {
       if (run.closed) return
       dispose(run); setPhase('idle')
-      setError(err.name === 'NotAllowedError' ? 'Разрешите доступ к микрофону в настройках браузера.' : err.name === 'NotFoundError' ? 'Микрофон не найден.' : err.name === 'AbortError' ? 'AI-сервис не отвечает. Запустите его и повторите.' : err.message)
+      setError(err.name === 'NotAllowedError' ? 'Разрешите доступ к микрофону в настройках браузера.' : err.name === 'NotFoundError' ? 'Микрофон не найден.' : err.message)
     }
   }
   return { phase, result, error, seconds, level, processing, start, stop, reset }

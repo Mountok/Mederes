@@ -54,11 +54,36 @@ class Recognizer:
                                   local_files_only=True)
 
     def transcribe(self, path, beam_size=None):
+        return self.transcribe_audio(decode_limited(path), beam_size=beam_size)
+
+    def transcribe_pcm16(self, pcm, sample_rate, beam_size=None):
+        import numpy as np
+        if sample_rate < 8000 or sample_rate > 96000 or len(pcm) % 2:
+            raise ValueError("Некорректный поток микрофона.")
+        source = np.frombuffer(pcm, dtype="<i2").astype(np.float32) / 32768
+        if len(source) > sample_rate * MAX_SECONDS:
+            raise ValueError("Запись должна быть не длиннее 60 секунд.")
+        if sample_rate == 16000:
+            audio = source
+        elif sample_rate % 16000 == 0:
+            factor = sample_rate // 16000
+            audio = source[:len(source) // factor * factor].reshape(-1, factor).mean(axis=1)
+        else:
+            count = round(len(source) * 16000 / sample_rate)
+            audio = np.interp(np.arange(count) * sample_rate / 16000,
+                              np.arange(len(source)), source).astype(np.float32)
+        return self.transcribe_audio(audio, beam_size=beam_size)
+
+    def transcribe_audio(self, audio, beam_size=None):
+        import numpy as np
         started = time.perf_counter()
         beam_size = self.beam_size if beam_size is None else beam_size
         if not 1 <= beam_size <= 10:
             raise ValueError("beam_size must be 1–10")
-        audio = decode_limited(path)
+        if len(audio) < 16000 or len(audio) > MAX_SECONDS * 16000 or not np.isfinite(audio).all():
+            raise ValueError("Запись должна длиться от 1 до 60 секунд.")
+        if np.max(np.abs(audio)) < 0.0001:
+            raise ValueError("В записи не обнаружен звук. Попробуйте другую запись.")
         segments, _ = self.model.transcribe(audio, language="ar", task="transcribe",
             beam_size=beam_size, temperature=0, condition_on_previous_text=False,
             vad_filter=self.vad, word_timestamps=False)
