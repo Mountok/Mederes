@@ -1,6 +1,8 @@
+import { useEffect, useState } from 'react'
 import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import { useAuth } from './auth/useAuth.jsx'
 import Navbar from './components/Navbar.jsx'
+import MobileTabBar from './components/MobileTabBar.jsx'
 import AiTestPage from './pages/AiTestPage.jsx'
 import ForbiddenPage from './pages/ForbiddenPage.jsx'
 import GroupDetailsPage from './pages/GroupDetailsPage.jsx'
@@ -38,8 +40,17 @@ function AppLayout() {
 }
 
 function App() {
+  const [online, setOnline] = useState(navigator.onLine)
+  useEffect(() => {
+    const update = () => setOnline(navigator.onLine)
+    window.addEventListener('online', update)
+    window.addEventListener('offline', update)
+    return () => { window.removeEventListener('online', update); window.removeEventListener('offline', update) }
+  }, [])
   return (
-    <Routes>
+    <>
+      {!online && <div className="app-offline-banner" role="status">Нет сети. Задания и распознавание будут доступны после подключения.</div>}
+      <Routes>
       <Route path="/" element={<LandingPage />} />
       <Route path="/ai-test" element={<AiTestPage />} />
       <Route path="/login" element={<LoginPage />} />
@@ -60,7 +71,9 @@ function App() {
         </Route>
       </Route>
       <Route path="*" element={<NotFoundPage />} />
-    </Routes>
+      </Routes>
+      <MobileTabBar />
+    </>
   )
 }
 

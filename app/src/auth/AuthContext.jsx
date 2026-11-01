@@ -44,13 +44,15 @@ export function AuthProvider({ children }) {
 
         window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextSession))
         setSession(nextSession)
-      } catch {
+      } catch (error) {
         if (ignore) {
           return
         }
-
-        window.localStorage.removeItem(STORAGE_KEY)
-        setSession(null)
+        // A temporary connection loss must not log out an installed web app.
+        if (error?.response?.status === 401 || error?.response?.status === 403) {
+          window.localStorage.removeItem(STORAGE_KEY)
+          setSession(null)
+        }
       }
     }
 
