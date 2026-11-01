@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { FiArrowLeft, FiMic, FiSquare, FiUpload, FiRotateCcw, FiVolume2 } from 'react-icons/fi'
 import useLiveRecitation from '../audio/useLiveRecitation.js'
 import useAyahAudio from '../audio/useAyahAudio.js'
 import { getSurahArabic, getSurahs } from '../api/quranApi.js'
+import { getHomeworkById, submitHomework } from '../api/mockApi.js'
+import { useAuth } from '../auth/useAuth.jsx'
 import './AiTestPage.css'
 
 const DEFAULT_SURAH = 112
@@ -13,6 +15,13 @@ const FALLBACK_AYAHS = ['قُلْ هُوَ اللَّهُ أَحَدٌ', 'الل
 const arabicNumber = value => String(value).replace(/\d/g, digit => '٠١٢٣٤٥٦٧٨٩'[Number(digit)])
 
 export default function AiTestPage() {
+  const [searchParams] = useSearchParams()
+  const assignmentId = searchParams.get('assignment')
+  const { user } = useAuth()
+  const [assignment, setAssignment] = useState(null)
+  const [assignmentError, setAssignmentError] = useState('')
+  const [submitted, setSubmitted] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
   const [surahs, setSurahs] = useState([])
   const [selectedSurah, setSelectedSurah] = useState(DEFAULT_SURAH)
   const [arabicSurah, setArabicSurah] = useState(null)
@@ -23,6 +32,8 @@ export default function AiTestPage() {
   const live = useLiveRecitation({ surah: selectedSurah, ayahFrom, ayahTo })
   const reference = useAyahAudio(selectedSurah)
   const [uploaded, setUploaded] = useState(null)
+  const [uploadedFile, setUploadedFile] = useState(null)
+  const [previewAudio, setPreviewAudio] = useState('')
   const [loading, setLoading] = useState(false)
   const [uploadError, setUploadError] = useState('')
   const request = useRef(null)
@@ -30,6 +41,28 @@ export default function AiTestPage() {
   const tracking = result?.tracking
   const active = ['requesting', 'listening', 'finishing'].includes(live.phase)
   const error = uploadError || live.error
+  const assignmentReady = !assignmentId || !!assignment
+  useEffect(() => {
+    const audio = uploadedFile || live.finalAudio
+    if (!audio) { setPreviewAudio(''); return }
+    const url = URL.createObjectURL(audio)
+    setPreviewAudio(url)
+    return () => URL.revokeObjectURL(url)
+  }, [uploadedFile, live.finalAudio])
+  useEffect(() => {
+    if (!assignmentId) return
+    let open = true
+    if (user?.role !== 'student') { setAssignmentError('Войдите как ученик, чтобы выполнить задание.'); return }
+    getHomeworkById(assignmentId).then(({ assignment: next, submissions }) => {
+      if (!open) return
+      if (next.kind !== 'recite' || submissions.length) { setAssignmentError('Это задание уже выполнено или недоступно.'); return }
+      setAssignment(next)
+      setSelectedSurah(next.surah)
+      setAyahFrom(next.ayahFrom)
+      setAyahTo(next.ayahTo)
+    }).catch(() => { if (open) setAssignmentError('Не удалось загрузить задание.') })
+    return () => { open = false }
+  }, [assignmentId, user?.role])
   const selectedSurahInfo = useMemo(
     () => surahs.find(surah => surah.number === selectedSurah) || (selectedSurah === DEFAULT_SURAH ? FALLBACK_SURAH : null),
     [selectedSurah, surahs],
@@ -70,7 +103,7 @@ export default function AiTestPage() {
   function reset() {
     reference.stop()
     request.current?.abort()
-    live.reset(); setUploaded(null); setUploadError('')
+    live.reset(); setUploaded(null); setUploadedFile(null); setUploadError('')
   }
   function requestUrl(path) {
     const query = new URLSearchParams({
@@ -102,9 +135,10 @@ export default function AiTestPage() {
   async function upload(event) {
     const next = event.target.files?.[0]
     event.target.value = ''
-    if (!next) return
+    if (!next || !assignmentReady) return
     reset()
     if (!next.size || next.size > 20 * 1024 * 1024) { setUploadError('Нужен аудиофайл до 20 МБ.'); return }
+    setUploadedFile(next)
     setLoading(true)
     const controller = new AbortController()
     request.current = controller
@@ -125,18 +159,27 @@ export default function AiTestPage() {
   }
   function startReading() {
     reference.stop()
-    setUploaded(null); setUploadError('')
+    setUploaded(null); setUploadedFile(null); setUploadError('')
     void live.start()
+  }
+  async function sendToTeacher() {
+    const audio = uploadedFile || live.finalAudio
+    if (!assignment || !audio || submitting) return
+    setSubmitting(true); setAssignmentError('')
+    try { await submitHomework(assignment.id, audio); setSubmitted(true) }
+    catch (err) { setAssignmentError(err.response?.data?.error?.message || 'Не удалось отправить запись. Попробуйте ещё раз.') }
+    finally { setSubmitting(false) }
   }
   const status = loading ? 'Проверяем запись' : live.phase === 'requesting' ? 'Подключаем микрофон' : live.phase === 'finishing' ? 'Завершаем проверку' : live.phase === 'listening' ? (live.processing ? 'Обновляем подсветку' : 'Слушаем') : tracking ? (result.final_fallback ? 'Предварительная подсветка — финал требует проверки' : tracking.low_confidence ? 'Найдены отдельные слова — проверьте чтение' : !tracking.aligned ? 'Не удалось сопоставить чтение' : !tracking.final ? 'Обновляем подсветку' : tracking.reviewed ? 'Проверьте выделенные слова' : tracking.complete ? 'Чтение завершено' : 'Диапазон прочитан не полностью') : ''
   let index = 0
   return (
     <div className="recitation-page">
-      <header className="recitation-header"><Link to="/" className="recitation-back"><FiArrowLeft /><img src="/logo_al-qalam.png" alt="" /><span>Al-Qalam</span></Link><span className="recitation-section">Практика чтения</span></header>
+      <header className="recitation-header"><Link to={assignment ? `/homework/${assignment.id}` : '/'} className="recitation-back"><FiArrowLeft /><img src="/logo_al-qalam.png" alt="" /><span>Al-Qalam</span></Link><span className="recitation-section">{assignment ? 'Домашнее задание' : 'Практика чтения'}</span></header>
       <main className="recitation-main">
-        <div className="recitation-title"><div><h1>Практика чтения</h1></div></div>
-        <div className="recitation-surah-picker"><span className="recitation-number">{selectedSurah}</span><label htmlFor="practice-surah"><span>Сура</span><select id="practice-surah" value={selectedSurah} disabled={active || loading} onChange={changeSurah}>{(surahs.length ? surahs : [FALLBACK_SURAH]).map(surah => <option value={surah.number} key={surah.number}>{surah.number}. {surah.englishName} · {surah.numberOfAyahs}</option>)}</select></label><span className="recitation-arabic-title" lang="ar">{selectedSurahInfo?.name}</span></div>
-        <div className="recitation-range" aria-label="Диапазон аятов"><label htmlFor="ayah-from"><span>Начать с аята</span><select id="ayah-from" value={ayahFrom} disabled={active || loading || catalogLoading || !ayahCount} onChange={changeAyahFrom}>{Array.from({ length: ayahCount }, (_, index) => index + 1).map(number => <option value={number} key={number}>{number}</option>)}</select></label><span className="recitation-range-dash">—</span><label htmlFor="ayah-to"><span>Закончить аятом</span><select id="ayah-to" value={ayahTo} disabled={active || loading || catalogLoading || !ayahCount} onChange={changeAyahTo}>{Array.from({ length: Math.min(MAX_AYAHS_PER_ATTEMPT, Math.max(0, ayahCount - ayahFrom + 1)) }, (_, index) => ayahFrom + index).map(number => <option value={number} key={number}>{number}</option>)}</select></label><span className="recitation-range-note">до {MAX_AYAHS_PER_ATTEMPT} за попытку</span></div>
+        <div className="recitation-title"><div><h1>{assignment?.title || 'Практика чтения'}</h1></div></div>
+        {assignmentError && <p className="recitation-error" role="alert">{assignmentError}</p>}
+        <div className="recitation-surah-picker"><span className="recitation-number">{selectedSurah}</span><label htmlFor="practice-surah"><span>Сура</span><select id="practice-surah" value={selectedSurah} disabled={active || loading || !!assignmentId} onChange={changeSurah}>{(surahs.length ? surahs : [FALLBACK_SURAH]).map(surah => <option value={surah.number} key={surah.number}>{surah.number}. {surah.englishName} · {surah.numberOfAyahs}</option>)}</select></label><span className="recitation-arabic-title" lang="ar">{selectedSurahInfo?.name}</span></div>
+        <div className="recitation-range" aria-label="Диапазон аятов"><label htmlFor="ayah-from"><span>Начать с аята</span><select id="ayah-from" value={ayahFrom} disabled={active || loading || catalogLoading || !ayahCount || !!assignmentId} onChange={changeAyahFrom}>{Array.from({ length: ayahCount }, (_, index) => index + 1).map(number => <option value={number} key={number}>{number}</option>)}</select></label><span className="recitation-range-dash">—</span><label htmlFor="ayah-to"><span>Закончить аятом</span><select id="ayah-to" value={ayahTo} disabled={active || loading || catalogLoading || !ayahCount || !!assignmentId} onChange={changeAyahTo}>{Array.from({ length: Math.min(MAX_AYAHS_PER_ATTEMPT, Math.max(0, ayahCount - ayahFrom + 1)) }, (_, index) => ayahFrom + index).map(number => <option value={number} key={number}>{number}</option>)}</select></label><span className="recitation-range-note">до {MAX_AYAHS_PER_ATTEMPT} за попытку</span></div>
         <section className="recitation-sheet" aria-label={`${selectedSurahInfo?.englishName || 'Выбранная сура'}, аяты ${ayahFrom}–${ayahTo}, с подсветкой распознанных слов`}>
           {showBasmala && <p className="recitation-basmala" lang="ar" dir="rtl">بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ</p>}
           {catalogLoading ? <div className="recitation-loading" role="status">Загружаем аяты…</div> : catalogError ? <p className="recitation-error" role="alert">{catalogError}</p> : <div className="recitation-verses" lang="ar" dir="rtl">{selectedAyahs.map(ayah => <p className="recitation-ayah" key={ayah.numberInSurah}>{ayah.text.split(' ').map(word => {
@@ -149,11 +192,12 @@ export default function AiTestPage() {
         {reference.error && <p className="recitation-error" role="alert">{reference.error}</p>}
         <div className="recitation-controls">
           {status ? <div className="recitation-status" role="status" aria-live="polite"><span className={`recitation-indicator ${active ? 'is-active' : ''}`} />{status}</div> : null}
-          <div className="recitation-action-row"><span className="recitation-timer">{String(Math.floor(live.seconds/60)).padStart(2,'0')}:{String(live.seconds%60).padStart(2,'0')}</span><button className={`recitation-primary ${live.phase === 'listening' ? 'is-recording' : ''}`} disabled={loading || catalogLoading || !selectionReady || ['requesting','finishing'].includes(live.phase)} onClick={() => { if (live.phase === 'listening') void live.stop(); else startReading() }}>{live.phase === 'listening' ? <FiSquare /> : <FiMic />}<span className="recitation-primary-label">{live.phase === 'listening' ? 'Завершить' : 'Начать чтение'}</span></button><span className="recitation-meter" aria-label={`Уровень микрофона ${Math.round(live.level*100)} процентов`}>{[0.6,1,0.75,0.9,0.5].map((scale,i) => <i key={i} style={{height:`${4+live.level*22*scale}px`}} />)}</span></div>
-          <div className="recitation-secondary"><label className={active || loading || catalogLoading || !selectionReady ? 'is-disabled' : ''}><FiUpload />Загрузить запись<input type="file" accept="audio/*,.mp3,.wav,.m4a,.webm,.ogg" disabled={active || loading || catalogLoading || !selectionReady} onChange={upload} /></label>{(result || error) && !active && !loading && <button type="button" onClick={reset}><FiRotateCcw />Заново</button>}</div>
+          <div className="recitation-action-row"><span className="recitation-timer">{String(Math.floor(live.seconds/60)).padStart(2,'0')}:{String(live.seconds%60).padStart(2,'0')}</span><button className={`recitation-primary ${live.phase === 'listening' ? 'is-recording' : ''}`} disabled={loading || catalogLoading || !selectionReady || !assignmentReady || submitted || ['requesting','finishing'].includes(live.phase)} onClick={() => { if (live.phase === 'listening') void live.stop(); else startReading() }}>{live.phase === 'listening' ? <FiSquare /> : <FiMic />}<span className="recitation-primary-label">{live.phase === 'listening' ? 'Завершить' : 'Начать чтение'}</span></button><span className="recitation-meter" aria-label={`Уровень микрофона ${Math.round(live.level*100)} процентов`}>{[0.6,1,0.75,0.9,0.5].map((scale,i) => <i key={i} style={{height:`${4+live.level*22*scale}px`}} />)}</span></div>
+          <div className="recitation-secondary"><label className={active || loading || catalogLoading || !selectionReady || !assignmentReady || submitted ? 'is-disabled' : ''}><FiUpload />Загрузить запись<input type="file" accept="audio/*,.mp3,.wav,.m4a,.webm,.ogg" disabled={active || loading || catalogLoading || !selectionReady || !assignmentReady || submitted} onChange={upload} /></label>{(result || error) && !active && !loading && !submitted && <button type="button" onClick={reset}><FiRotateCcw />Заново</button>}</div>
           {error && <p className="recitation-error" role="alert">{error}</p>}
           {live.phase === 'requesting' && <button type="button" className="recitation-cancel" onClick={reset}>Отменить</button>}
         </div>
+        {assignment && (uploadedFile || live.finalAudio) && !active && !loading && <div className="recitation-homework-submit">{submitted ? <Link to={`/homework/${assignment.id}`}>Запись отправлена · Вернуться к заданию</Link> : <><p>Послушайте свою запись. Если хотите, прочитайте ещё раз. Когда будете готовы, отправьте преподавателю.</p>{previewAudio && <audio controls preload="metadata" src={previewAudio} aria-label="Ваша запись чтения" />}<div className="recitation-homework-actions"><button type="button" className="is-outline" disabled={submitting} onClick={reset}>Перезаписать</button><button type="button" disabled={submitting} onClick={sendToTeacher}>{submitting ? 'Отправляем…' : 'Отправить преподавателю'}</button></div></>}</div>}
       </main>
       <footer className="recitation-footer">Al-Qalam</footer>
     </div>

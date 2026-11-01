@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { FiBookOpen, FiCalendar, FiClock, FiGrid, FiUsers } from 'react-icons/fi'
 import { Link } from 'react-router-dom'
-import { getGroupJournal, getGroups } from '../api/mockApi.js'
+import { getGroupJournal, getGroups, getHomework } from '../api/mockApi.js'
 import GroupCard from '../components/GroupCard.jsx'
 import StatusState from '../components/StatusState.jsx'
 
@@ -79,6 +79,7 @@ function StudentHomePage() {
   const [journal, setJournal] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [assignedHomework, setAssignedHomework] = useState([])
 
   const weekDays = useMemo(() => buildWeekDays(), [])
   const todayISO = toISODate(new Date())
@@ -91,6 +92,8 @@ function StudentHomePage() {
       setError('')
 
       try {
+        const homework = await getHomework().catch(() => [])
+        setAssignedHomework(homework)
         const groups = await getGroups()
         const studentGroup = groups[0]
 
@@ -207,6 +210,8 @@ function StudentHomePage() {
             />
           </div>
         </div>
+
+        {assignedHomework.length > 0 && <div className="student-homework-section" style={{ marginTop: 22 }}><h4>Задания для группы</h4><div className="student-homework-list">{assignedHomework.slice(0, 4).map(item => <Link className="student-homework-item" key={item.id} to={`/homework/${item.id}`}><strong>{item.title}</strong><p>Сура {item.surah} · аяты {item.ayahFrom}–{item.ayahTo} · {item.myStatus === 'submitted' ? 'Ждёт проверки' : item.myStatus === 'reviewed' ? 'Проверено' : item.myStatus === 'completed' ? 'Выполнено' : 'Открыть задание'}</p></Link>)}</div><Link className="button button-secondary" style={{ marginTop: 16 }} to="/homework">Все задания</Link></div>}
       </section>
 
       <section className="surface">

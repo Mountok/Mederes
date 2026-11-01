@@ -10,6 +10,7 @@ import LandingPage from './pages/LandingPage.jsx'
 import LessonPage from './pages/LessonPage.jsx'
 import LiveUnavailablePage from './pages/LiveUnavailablePage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
+import HomeworkPage, { HomeworkDetailPage } from './pages/HomeworkPage.jsx'
 import NotFoundPage from './pages/NotFoundPage.jsx'
 import QuranPage from './pages/QuranPage.jsx'
 import StaffPage from './pages/StaffPage.jsx'
@@ -52,6 +53,8 @@ function App() {
           <Route path="/group/:id/journal" element={<GroupJournalPage />} />
           <Route path="/lesson/:id" element={<LessonPage />} />
           <Route path="/quran" element={<QuranPage />} />
+          <Route path="/homework" element={<HomeworkPage />} />
+          <Route path="/homework/:id" element={<HomeworkDetailPage />} />
           <Route path="/staff" element={<StaffPage />} />
           <Route path="/live" element={<LiveUnavailablePage />} />
         </Route>

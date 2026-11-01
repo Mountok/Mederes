@@ -12,21 +12,23 @@ import (
 )
 
 type Config struct {
-	AppHost       string
-	AppPort       string
-	AppEnv        string
-	DBHost        string
-	DBPort        string
-	DBName        string
-	DBUser        string
-	DBPassword    string
-	DBSSLMode     string
-	JWTSecret     string
-	AdminAPIKey   string
-	LogFilePath   string
-	LiveKitURL    string
-	LiveKitKey    string
-	LiveKitSecret string
+	AppHost          string
+	AppPort          string
+	AppEnv           string
+	DBHost           string
+	DBPort           string
+	DBName           string
+	DBUser           string
+	DBPassword       string
+	DBSSLMode        string
+	JWTSecret        string
+	AdminAPIKey      string
+	LogFilePath      string
+	LiveKitURL       string
+	LiveKitKey       string
+	LiveKitSecret    string
+	HomeworkAudioDir string
+	AIServiceURL     string
 }
 
 func Load() (Config, error) {
@@ -35,21 +37,23 @@ func Load() (Config, error) {
 	}
 
 	cfg := Config{
-		AppHost:       getenv("APP_HOST", "127.0.0.1"),
-		AppPort:       getenv("APP_PORT", "8000"),
-		AppEnv:        getenv("APP_ENV", "development"),
-		DBHost:        getenv("DB_HOST", "localhost"),
-		DBPort:        getenv("DB_PORT", "5432"),
-		DBName:        getenv("DB_NAME", "medrese"),
-		DBUser:        getenv("DB_USER", "postgres"),
-		DBPassword:    os.Getenv("DB_PASSWORD"),
-		DBSSLMode:     getenv("DB_SSLMODE", "disable"),
-		JWTSecret:     getenv("JWT_SECRET", "change-me-dev-secret"),
-		AdminAPIKey:   getenv("ADMIN_API_KEY", "change-me-admin-key"),
-		LogFilePath:   getenv("LOG_FILE_PATH", "logs/app.log"),
-		LiveKitURL:    getenv("LIVEKIT_URL", "ws://localhost:7880"),
-		LiveKitKey:    getenv("LIVEKIT_API_KEY", "devkey"),
-		LiveKitSecret: getenv("LIVEKIT_API_SECRET", "secret"),
+		AppHost:          getenv("APP_HOST", "127.0.0.1"),
+		AppPort:          getenv("APP_PORT", "8000"),
+		AppEnv:           getenv("APP_ENV", "development"),
+		DBHost:           getenv("DB_HOST", "localhost"),
+		DBPort:           getenv("DB_PORT", "5432"),
+		DBName:           getenv("DB_NAME", "medrese"),
+		DBUser:           getenv("DB_USER", "postgres"),
+		DBPassword:       os.Getenv("DB_PASSWORD"),
+		DBSSLMode:        getenv("DB_SSLMODE", "disable"),
+		JWTSecret:        getenv("JWT_SECRET", "change-me-dev-secret"),
+		AdminAPIKey:      getenv("ADMIN_API_KEY", "change-me-admin-key"),
+		LogFilePath:      getenv("LOG_FILE_PATH", "logs/app.log"),
+		LiveKitURL:       getenv("LIVEKIT_URL", "ws://localhost:7880"),
+		LiveKitKey:       getenv("LIVEKIT_API_KEY", "devkey"),
+		LiveKitSecret:    getenv("LIVEKIT_API_SECRET", "secret"),
+		HomeworkAudioDir: getenv("HOMEWORK_AUDIO_DIR", "storage/homework"),
+		AIServiceURL:     getenv("AI_SERVICE_URL", "http://127.0.0.1:8001"),
 	}
 
 	if strings.TrimSpace(cfg.DBName) == "" || strings.TrimSpace(cfg.DBUser) == "" {
@@ -77,7 +81,7 @@ func (c Config) HTTPServer(handler http.Handler) *http.Server {
 		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       15 * time.Second,
-		WriteTimeout:      15 * time.Second,
+		WriteTimeout:      90 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}
 }

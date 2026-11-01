@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { FiBookOpen, FiPause, FiPlay, FiStopCircle } from 'react-icons/fi'
 import {
   getRussianEditions,
@@ -27,8 +28,13 @@ function readLastSurah() {
 }
 
 function QuranPage() {
+  const [searchParams] = useSearchParams()
+  const requestedSurah = Number(searchParams.get('surah'))
+  const requestedAyah = Number(searchParams.get('ayah'))
+  const requestedAyahTo = Number(searchParams.get('ayahTo'))
+  const assignmentId = searchParams.get('assignment')
   const [surahs, setSurahs] = useState([])
-  const [selectedSurah, setSelectedSurah] = useState(() => readLastSurah())
+  const [selectedSurah, setSelectedSurah] = useState(() => requestedSurah >= 1 && requestedSurah <= 114 ? requestedSurah : readLastSurah())
   const [translationEdition, setTranslationEdition] = useState(DEFAULT_TRANSLATION)
   const [arabicSurah, setArabicSurah] = useState(null)
   const [translatedSurah, setTranslatedSurah] = useState(null)
@@ -44,6 +50,14 @@ function QuranPage() {
   const activeAyahRef = useRef(null)
   const playbackModeRef = useRef('single')
   const surahQueueRef = useRef([])
+
+  useEffect(() => {
+    if (requestedSurah >= 1 && requestedSurah <= 114) setSelectedSurah(requestedSurah)
+  }, [requestedSurah])
+
+  useEffect(() => {
+    if (!surahLoading && requestedAyah >= 1) document.getElementById(`quran-ayah-${requestedAyah}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  }, [surahLoading, requestedAyah, selectedSurah])
 
   useEffect(() => {
     async function loadInitialData() {
@@ -306,6 +320,15 @@ function QuranPage() {
     playAudio(firstAyah.audio, firstAyah.numberInSurah, 'surah')
   }
 
+  function playAssignedRange() {
+    const ayahs = audioSurah?.ayahs
+      ?.filter(ayah => ayah.audio && ayah.numberInSurah >= requestedAyah && ayah.numberInSurah <= requestedAyahTo)
+      .sort((a, b) => a.numberInSurah - b.numberInSurah) ?? []
+    if (!ayahs.length) { setError('Аудио для этих аятов недоступно'); return }
+    surahQueueRef.current = ayahs.slice(1)
+    playAudio(ayahs[0].audio, ayahs[0].numberInSurah, 'surah')
+  }
+
   if (surahsLoading) {
     return (
       <div className="page-grid">
@@ -325,7 +348,10 @@ function QuranPage() {
             <span>Чтец: Mishary Alafasy</span>
           </div>
         </div>
+        {assignmentId && <div className="page-header-actions"><Link className="button button-secondary" to={`/homework/${assignmentId}`}>Вернуться к заданию</Link></div>}
       </section>
+
+      {assignmentId && searchParams.get('listen') === '1' && <div className="quran-assignment-hint"><span>Аяты {requestedAyah}–{requestedAyahTo} выделены ниже.</span><Button variant="secondary" onClick={playAssignedRange} disabled={surahLoading || !audioSurah?.ayahs?.length}><FiPlay /> Прослушать задание</Button></div>}
 
       <section className="surface quran-layout pulse-in">
         <aside className="quran-sidebar" aria-label="Выбор суры">
@@ -421,7 +447,8 @@ function QuranPage() {
                 return (
                   <article
                     key={ayah.number}
-                    className={`quran-ayah ${isActive ? 'highlighted' : ''}`}
+                    id={`quran-ayah-${ayah.numberInSurah}`}
+                    className={`quran-ayah ${isActive || (assignmentId && ayah.numberInSurah >= requestedAyah && ayah.numberInSurah <= requestedAyahTo) ? 'highlighted' : ''}`}
                   >
                     <button
                       type="button"

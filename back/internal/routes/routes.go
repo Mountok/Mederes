@@ -23,6 +23,7 @@ func Setup(
 	lessonHandler *handlers.LessonHandler,
 	attendanceHandler *handlers.AttendanceHandler,
 	liveHandler *handlers.LiveHandler,
+	homeworkHandler *handlers.HomeworkHandler,
 ) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 
@@ -54,6 +55,9 @@ func Setup(
 	protected.GET("/groups/:id", groupHandler.GetByID)
 	protected.GET("/groups/:id/journal", groupHandler.GetJournal)
 	protected.GET("/lessons/:id", lessonHandler.GetByID)
+	protected.GET("/homework", homeworkHandler.List)
+	protected.GET("/homework/:id", homeworkHandler.Get)
+	protected.GET("/homework/:id/audio/:studentId", homeworkHandler.Audio)
 
 	teacherOnly := protected.Group("/")
 	teacherOnly.Use(middleware.RequireRoles("teacher"))
@@ -80,6 +84,13 @@ func Setup(
 	teacherOrStaff.DELETE("/lessons/:id", lessonHandler.Delete)
 	teacherOrStaff.PUT("/attendance", attendanceHandler.Update)
 	teacherOrStaff.PUT("/lessons/:id/attendance/all", attendanceHandler.SetAll)
+	teacherOrStaff.POST("/homework", homeworkHandler.Create)
+	teacherOrStaff.PUT("/homework/:id/submissions/:studentId/review", homeworkHandler.Review)
+
+	studentOnly := protected.Group("/")
+	studentOnly.Use(middleware.RequireRoles("student"))
+	studentOnly.POST("/homework/:id/complete", homeworkHandler.Complete)
+	studentOnly.POST("/homework/:id/submit", homeworkHandler.Submit)
 
 	return router
 }

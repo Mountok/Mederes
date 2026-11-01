@@ -76,3 +76,40 @@ export async function setAttendanceForAll(lessonId, attended) {
   })
   return data
 }
+
+export async function getHomework() {
+  const { data } = await api.get('/homework')
+  return data
+}
+
+export async function getHomeworkById(id) {
+  const { data } = await api.get(`/homework/${id}`)
+  return data
+}
+
+export async function createHomework(payload) {
+  const { data } = await api.post('/homework', payload)
+  return data
+}
+
+export async function completeHomework(id) {
+  const { data } = await api.post(`/homework/${id}/complete`)
+  return data
+}
+
+export async function submitHomework(id, audio) {
+  const form = new FormData()
+  form.append('audio', audio, audio.name || 'reading.wav')
+  const { data } = await api.post(`/homework/${id}/submit`, form, { timeout: 90000 })
+  return data
+}
+
+export async function reviewHomework(id, studentId, payload) {
+  const { data } = await api.put(`/homework/${id}/submissions/${studentId}/review`, payload)
+  return data
+}
+
+export async function getHomeworkAudio(id, studentId) {
+  const { data } = await api.get(`/homework/${id}/audio/${studentId}`, { responseType: 'blob' })
+  return data
+}

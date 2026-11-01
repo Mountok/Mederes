@@ -14,6 +14,7 @@ export default function useLiveRecitation(selection) {
   const [seconds, setSeconds] = useState(0)
   const [level, setLevel] = useState(0)
   const [processing, setProcessing] = useState(false)
+  const [finalAudio, setFinalAudio] = useState(null)
   const session = useRef(null)
   function endpoint(path) {
     const query = new URLSearchParams({
@@ -39,6 +40,7 @@ export default function useLiveRecitation(selection) {
     dispose(session.current); session.current = null
     setPhase('idle'); setResult(null); setError(''); setSeconds(0); setLevel(0)
     setProcessing(false)
+    setFinalAudio(null)
   }
   async function stop() {
     const run = session.current
@@ -56,6 +58,7 @@ export default function useLiveRecitation(selection) {
     if (run.closed) return
     run.node.disconnect(); void run.context.close().catch(() => {})
     const blob = wavBlob(run.chunks, run.rate)
+    setFinalAudio(blob)
     run.queue.close()
     run.confirmQueue.close()
     run.controllers.forEach(controller => controller.abort())
@@ -166,5 +169,5 @@ export default function useLiveRecitation(selection) {
       setError(err.name === 'NotAllowedError' ? 'Разрешите доступ к микрофону в настройках браузера.' : err.name === 'NotFoundError' ? 'Микрофон не найден.' : err.name === 'AbortError' ? 'AI-сервис не отвечает. Запустите его и повторите.' : err.message)
     }
   }
-  return { phase, result, error, seconds, level, processing, start, stop, reset }
+  return { phase, result, error, seconds, level, processing, finalAudio, start, stop, reset }
 }

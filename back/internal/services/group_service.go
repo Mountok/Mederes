@@ -129,6 +129,16 @@ func (s *GroupService) GetByID(ctx context.Context, id string, claims *auth.Clai
 	if students == nil {
 		students = []models.Student{}
 	}
+	if claims.Role == "student" {
+		own := make([]models.Student, 0, 1)
+		for _, student := range students {
+			if student.ID == claims.StudentID {
+				student.Note = ""
+				own = append(own, student)
+			}
+		}
+		students = own
+	}
 
 	lessons, err := s.lessonRepo.ListByGroup(ctx, id, claims.SchoolID)
 	if err != nil {
@@ -184,6 +194,16 @@ func (s *GroupService) GetJournal(ctx context.Context, claims *auth.Claims, grou
 	if students == nil {
 		students = []models.Student{}
 	}
+	if claims.Role == "student" {
+		own := make([]models.Student, 0, 1)
+		for _, student := range students {
+			if student.ID == claims.StudentID {
+				student.Note = ""
+				own = append(own, student)
+			}
+		}
+		students = own
+	}
 
 	lessons, err := s.lessonRepo.ListByGroupAndPeriod(ctx, groupID, claims.SchoolID, from, to)
 	if err != nil {
@@ -204,6 +224,13 @@ func (s *GroupService) GetJournal(ctx context.Context, claims *auth.Claims, grou
 	}
 	if entries == nil {
 		entries = []models.GroupJournalEntry{}
+	}
+	if claims.Role == "student" {
+		own := make([]models.GroupJournalEntry, 0, len(entries))
+		for _, entry := range entries {
+			if entry.StudentID == claims.StudentID { own = append(own, entry) }
+		}
+		entries = own
 	}
 
 	journalStudents := make([]models.GroupJournalStudent, 0, len(students))

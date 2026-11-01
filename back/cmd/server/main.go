@@ -84,6 +84,7 @@ func main() {
 	lessonHandler := handlers.NewLessonHandler(lessonService, logger)
 	attendanceHandler := handlers.NewAttendanceHandler(attendanceService, logger)
 	liveHandler := handlers.NewLiveHandler(liveService, jwtManager, liveHub, logger)
+	homeworkHandler := handlers.NewHomeworkHandler(conn, accessService, logger, cfg.HomeworkAudioDir, cfg.AIServiceURL)
 
 	router := routes.Setup(
 		logger,
@@ -97,6 +98,7 @@ func main() {
 		lessonHandler,
 		attendanceHandler,
 		liveHandler,
+		homeworkHandler,
 	)
 
 	server := cfg.HTTPServer(router)

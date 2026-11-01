@@ -1,4 +1,4 @@
-import { FiArrowLeft, FiBookOpen, FiUserPlus } from 'react-icons/fi'
+import { FiArrowLeft, FiBookOpen, FiUserPlus, FiClipboard } from 'react-icons/fi'
 import { NavLink, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth.jsx'
 
@@ -19,27 +19,19 @@ function Navbar() {
           </div>
         </NavLink>
 
-        <nav className="nav-links" aria-label="Основная навигация">
-          <NavLink className="nav-link" to="/ai-test">Практика чтения</NavLink>
-          <NavLink className="nav-link" to="/groups">
-            Группы
-          </NavLink>
-          <NavLink className="nav-link nav-link-quran" to="/quran">
-            <FiBookOpen />
-            Коран
-          </NavLink>
-          {isTeacher ? (
-            <NavLink className="nav-link" to="/staff">
-              <FiUserPlus />
-              Преподаватели
-            </NavLink>
-          ) : null}
+        <div className="navbar-account">
           <span className="nav-role">{user?.label}</span>
-          <button type="button" className="nav-link nav-logout" onClick={logout}>
-            Выйти
-          </button>
-        </nav>
+          <button type="button" className="nav-link nav-logout" onClick={logout}>Выйти</button>
+        </div>
       </div>
+
+      <nav className="nav-links" aria-label="Основная навигация">
+        <NavLink className="nav-link" to="/ai-test">Практика чтения</NavLink>
+        <NavLink className="nav-link" to="/groups">Группы</NavLink>
+        {user?.role !== 'parent' && <NavLink className="nav-link" to="/homework"><FiClipboard /> Задания</NavLink>}
+        <NavLink className="nav-link nav-link-quran" to="/quran"><FiBookOpen />Коран</NavLink>
+        {isTeacher && <NavLink className="nav-link" to="/staff"><FiUserPlus />Преподаватели</NavLink>}
+      </nav>
 
       {location.pathname !== '/groups' ? (
         <div className="filter-row navbar-back-row">

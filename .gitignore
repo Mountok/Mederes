@@ -39,4 +39,5 @@ ai-service/.venv-train/
 ai-service/training-runs/
 ai-service/models/
 ai-service/results/
+back/storage/
 __pycache__/
