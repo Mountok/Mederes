@@ -38,7 +38,9 @@ export default function MobileTabBar() {
     setInstallEvent(null)
   }
 
-  const tabs = user ? [
+  const tabs = user?.role === 'platform_admin' ? [
+    { to: '/platform', label: 'Школы', icon: FiGrid, active: /^\/platform(\/|$)/ },
+  ] : user ? [
     { to: '/groups', label: 'Группы', icon: FiGrid, active: /^\/(groups|group|lesson)(\/|$)/ },
     ...(user.role === 'parent' ? [] : [{ to: '/homework', label: 'Задания', icon: FiClipboard, active: /^\/homework(\/|$)/ }]),
     { to: '/quran', label: 'Коран', icon: FiBookOpen, active: /^\/quran(\/|$)/ },

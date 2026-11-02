@@ -14,6 +14,7 @@ import LiveUnavailablePage from './pages/LiveUnavailablePage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import HomeworkPage, { HomeworkDetailPage } from './pages/HomeworkPage.jsx'
 import NotFoundPage from './pages/NotFoundPage.jsx'
+import PlatformPage from './pages/PlatformPage.jsx'
 import QuranPage from './pages/QuranPage.jsx'
 import StaffPage from './pages/StaffPage.jsx'
 
@@ -23,6 +24,10 @@ function ProtectedRoute() {
 
   if (!user) {
     return <Navigate to="/login" replace state={{ from: location }} />
+  }
+
+  if (user.role === 'platform_admin' && location.pathname !== '/platform') {
+    return <Navigate to="/platform" replace />
   }
 
   return <Outlet />
@@ -37,6 +42,11 @@ function AppLayout() {
       </main>
     </div>
   )
+}
+
+function PlatformRoute() {
+  const { user } = useAuth()
+  return user?.role === 'platform_admin' ? <Outlet /> : <Navigate to="/forbidden" replace />
 }
 
 function App() {
@@ -58,6 +68,9 @@ function App() {
       <Route path="/live/:id" element={<LiveUnavailablePage />} />
       <Route path="/forbidden" element={<ForbiddenPage />} />
       <Route element={<ProtectedRoute />}>
+        <Route element={<PlatformRoute />}>
+          <Route path="/platform" element={<PlatformPage />} />
+        </Route>
         <Route element={<AppLayout />}>
           <Route path="/groups" element={<GroupsPage />} />
           <Route path="/group/:id" element={<GroupDetailsPage />} />

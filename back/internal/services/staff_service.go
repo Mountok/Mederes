@@ -63,7 +63,7 @@ func (s *StaffService) Create(ctx context.Context, schoolID string, request mode
 			return nil, models.InternalError("Не удалось сгенерировать логин преподавателя", err)
 		}
 
-		password, err := staffRandomString(staffPasswordAlphabet, 10)
+		password, err := staffRandomString(staffPasswordAlphabet, 24)
 		if err != nil {
 			return nil, models.InternalError("Не удалось сгенерировать пароль преподавателя", err)
 		}
@@ -219,7 +219,7 @@ func (s *StaffService) ResetAccess(ctx context.Context, schoolID string, staffID
 		return nil, models.InternalError("Не удалось получить доступ преподавателя", err)
 	}
 
-	password, err := staffRandomString(staffPasswordAlphabet, 10)
+	password, err := staffRandomString(staffPasswordAlphabet, 24)
 	if err != nil {
 		return nil, models.InternalError("Не удалось сгенерировать пароль преподавателя", err)
 	}

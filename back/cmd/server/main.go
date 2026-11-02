@@ -55,7 +55,7 @@ func main() {
 	jwtManager := auth.NewJWTManager(cfg.JWTSecret, 24*time.Hour)
 
 	authRepo := repository.NewAuthRepository(conn)
-	adminRepo := repository.NewAdminRepository(conn)
+	platformRepo := repository.NewPlatformRepository(conn)
 	groupRepo := repository.NewGroupRepository(conn)
 	studentRepo := repository.NewStudentRepository(conn)
 	staffRepo := repository.NewStaffRepository(conn)
@@ -68,7 +68,7 @@ func main() {
 	accessService := services.NewAccessService(groupRepo, studentRepo, staffRepo)
 
 	authService := services.NewAuthService(authRepo, jwtManager)
-	adminService := services.NewAdminService(adminRepo)
+	platformService := services.NewPlatformService(platformRepo)
 	groupService := services.NewGroupService(groupRepo, studentRepo, staffRepo, lessonRepo, attendanceRepo, accessService)
 	studentService := services.NewStudentService(studentRepo, groupRepo, accessService)
 	staffService := services.NewStaffService(staffRepo, groupRepo)
@@ -77,7 +77,7 @@ func main() {
 	liveService := services.NewLiveService(liveRepo, groupRepo, liveKitClient)
 
 	authHandler := handlers.NewAuthHandler(authService, logger)
-	adminHandler := handlers.NewAdminHandler(adminService, logger)
+	platformHandler := handlers.NewPlatformHandler(platformService, logger)
 	groupHandler := handlers.NewGroupHandler(groupService, logger)
 	studentHandler := handlers.NewStudentHandler(studentService, logger)
 	staffHandler := handlers.NewStaffHandler(staffService, logger)
@@ -89,9 +89,8 @@ func main() {
 	router := routes.Setup(
 		logger,
 		jwtManager,
-		cfg.AdminAPIKey,
 		authHandler,
-		adminHandler,
+		platformHandler,
 		groupHandler,
 		studentHandler,
 		staffHandler,

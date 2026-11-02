@@ -82,7 +82,6 @@ DB_USER=postgres
 DB_PASSWORD=postgres
 DB_SSLMODE=disable
 JWT_SECRET=super-secret-key
-ADMIN_API_KEY=very-strong-admin-key
 LOG_FILE_PATH=/srv/medrese/back/logs/app.log
 
 LIVEKIT_URL=ws://127.0.0.1:7880
@@ -217,15 +216,12 @@ http://localhost:5173
 
 ## 8. Тестовые логины
 
-Базовые seed-логины:
-
-- teacher: `teacher / 12345678@`
-- parent: `parent / 12345678@`
+Миграция `009` создаёт демо-аккаунты `teacher` и `parent`, но миграция `016` отключает их известный пароль. Для проверки демо-школы владелец платформы должен выдать новый пароль через `/platform`. Не используйте старый пароль из истории Git.
 
 Дополнительно:
 
 - `student` создаётся при создании ученика;
-- `staff` создаётся через `POST /api/staff`.
+- `staff` создаётся администратором школы через интерфейс преподавателей или `POST /api/staff`.
 
 ---
 

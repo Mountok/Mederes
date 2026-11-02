@@ -13,7 +13,7 @@ function LoginPage() {
   const [error, setError] = useState('')
 
   if (user) {
-    return <Navigate to="/groups" replace />
+    return <Navigate to={user.role === 'platform_admin' ? '/platform' : '/groups'} replace />
   }
 
   async function handleSubmit(event) {
@@ -26,7 +26,7 @@ function LoginPage() {
       return
     }
 
-    const redirectTo = location.state?.from?.pathname ?? '/groups'
+    const redirectTo = result.user.role === 'platform_admin' ? '/platform' : (location.state?.from?.pathname ?? '/groups')
     navigate(redirectTo, { replace: true })
   }
 

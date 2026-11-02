@@ -22,7 +22,6 @@ type Config struct {
 	DBPassword       string
 	DBSSLMode        string
 	JWTSecret        string
-	AdminAPIKey      string
 	LogFilePath      string
 	LiveKitURL       string
 	LiveKitKey       string
@@ -47,7 +46,6 @@ func Load() (Config, error) {
 		DBPassword:       os.Getenv("DB_PASSWORD"),
 		DBSSLMode:        getenv("DB_SSLMODE", "disable"),
 		JWTSecret:        getenv("JWT_SECRET", "change-me-dev-secret"),
-		AdminAPIKey:      getenv("ADMIN_API_KEY", "change-me-admin-key"),
 		LogFilePath:      getenv("LOG_FILE_PATH", "logs/app.log"),
 		LiveKitURL:       getenv("LIVEKIT_URL", "ws://localhost:7880"),
 		LiveKitKey:       getenv("LIVEKIT_API_KEY", "devkey"),
@@ -58,6 +56,9 @@ func Load() (Config, error) {
 
 	if strings.TrimSpace(cfg.DBName) == "" || strings.TrimSpace(cfg.DBUser) == "" {
 		return Config{}, fmt.Errorf("database config is incomplete")
+	}
+	if cfg.AppEnv == "production" && (len(cfg.JWTSecret) < 32 || cfg.JWTSecret == "change-me-dev-secret" || cfg.JWTSecret == "super-secret-key") {
+		return Config{}, fmt.Errorf("production requires a random JWT_SECRET of at least 32 characters")
 	}
 
 	return cfg, nil

@@ -14,9 +14,8 @@ import (
 func Setup(
 	logger *logrus.Logger,
 	jwtManager *auth.JWTManager,
-	adminAPIKey string,
 	authHandler *handlers.AuthHandler,
-	adminHandler *handlers.AdminHandler,
+	platformHandler *handlers.PlatformHandler,
 	groupHandler *handlers.GroupHandler,
 	studentHandler *handlers.StudentHandler,
 	staffHandler *handlers.StaffHandler,
@@ -43,14 +42,17 @@ func Setup(
 	api.POST("/live/rooms/:id/messages", liveHandler.SendMessage)
 	api.GET("/live/rooms/:id/ws", liveHandler.WebSocket)
 
-	admin := api.Group("/admin")
-	admin.Use(middleware.AdminKeyMiddleware(adminAPIKey))
-	admin.POST("/schools", adminHandler.CreateSchoolWithUsers)
-
 	protected := api.Group("/")
 	protected.Use(middleware.AuthMiddleware(jwtManager))
 
 	protected.GET("/me", authHandler.Me)
+	platform := protected.Group("/platform")
+	platform.Use(middleware.RequireRoles("platform_admin"))
+	platform.GET("/schools", platformHandler.List)
+	platform.POST("/schools", platformHandler.Create)
+	platform.GET("/schools/:id", platformHandler.Detail)
+	platform.PATCH("/schools/:id", platformHandler.Rename)
+	platform.POST("/schools/:id/users/:userId/access/reset", platformHandler.ResetAccess)
 	protected.GET("/groups", groupHandler.List)
 	protected.GET("/groups/:id", groupHandler.GetByID)
 	protected.GET("/groups/:id/journal", groupHandler.GetJournal)

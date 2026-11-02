@@ -11,7 +11,7 @@ const FEATURES = [
 
 export default function LandingPage() {
   const { user } = useAuth()
-  const href = user ? '/groups' : '/login'
+  const href = user?.role === 'platform_admin' ? '/platform' : user ? '/groups' : '/login'
   const label = user ? 'Открыть журнал' : 'Войти'
   return <div className="landing-shell">
     <header className="landing-header">

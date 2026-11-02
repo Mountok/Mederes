@@ -133,24 +133,6 @@ type UpdateAttendanceAllRequest struct {
 	Attended bool `json:"attended"`
 }
 
-type CreateSchoolWithUsersRequest struct {
-	SchoolName string                `json:"schoolName"`
-	Teacher    CreateSchoolUserInput `json:"teacher"`
-	Parent     CreateSchoolUserInput `json:"parent"`
-}
-
-type CreateSchoolUserInput struct {
-	Login    string `json:"login"`
-	Password string `json:"password"`
-	Label    string `json:"label"`
-}
-
-type CreateSchoolWithUsersResponse struct {
-	School  School   `json:"school"`
-	Teacher UserInfo `json:"teacher"`
-	Parent  UserInfo `json:"parent"`
-}
-
 type CurrentUserResponse struct {
 	User   UserInfo   `json:"user"`
 	School SchoolInfo `json:"school"`
