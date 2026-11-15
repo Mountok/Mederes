@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { FiArrowRight, FiCheck, FiCopy, FiLogOut, FiPlus, FiRefreshCw, FiSearch, FiX } from 'react-icons/fi'
+import { useSearchParams } from 'react-router-dom'
+import { PlatformReaders } from './PlatformReaders.jsx'
 import { useAuth } from '../auth/useAuth.jsx'
 import { MobileMenuButton } from '../components/MobileNavigation.jsx'
 import { createPlatformSchool, getPlatformSchool, listPlatformInquiries, listPlatformSchools, renamePlatformSchool, resetPlatformAccess } from '../api/platformApi.js'
@@ -30,6 +32,21 @@ function Credentials({ account, onClose }) {
 
 export default function PlatformPage() {
   const { user, logout } = useAuth()
+  const [params, setParams] = useSearchParams()
+  const readers = params.get('section') === 'readers'
+  return <div className="platform-page">
+    <header className="platform-topbar"><a href="/platform" className="platform-brand"><img src="/logo_al-qalam.png" alt="" />Al-Qalam <span>Управление</span></a><div><span>{user?.label}</span><button type="button" onClick={logout}><FiLogOut /> Выйти</button><MobileMenuButton /></div></header>
+    <main className="platform-main">
+      <nav aria-label="Разделы управления" className="platform-sections">
+        <button type="button" aria-pressed={!readers} onClick={() => setParams({})}>Организации</button>
+        <button type="button" aria-pressed={readers} onClick={() => setParams({ section: 'readers' })}>Личные пользователи</button>
+      </nav>
+      {readers ? <PlatformReaders /> : <Organizations />}
+    </main>
+  </div>
+}
+
+function Organizations() {
   const [schools, setSchools] = useState([])
   const [inquiries, setInquiries] = useState([])
   const [selectedId, setSelectedId] = useState('')
@@ -99,10 +116,8 @@ export default function PlatformPage() {
     finally { setBusy(false) }
   }
 
-  return <div className="platform-page">
-    <header className="platform-topbar"><a href="/platform" className="platform-brand"><img src="/logo_al-qalam.png" alt="" />Al-Qalam <span>Управление</span></a><div><span>{user?.label}</span><button type="button" onClick={logout}><FiLogOut /> Выйти</button><MobileMenuButton /></div></header>
-    <main className="platform-main">
-      <div className="platform-title"><div><span className="platform-kicker">ПАНЕЛЬ ПЛАТФОРМЫ</span><h1>Школы</h1><p>Учётные записи, состав и доступ в одном месте.</p></div><button type="button" className="platform-button" onClick={() => { setShowCreate(true); setSelectedId(''); setDetail(null); setError('') }}><FiPlus /> Добавить школу</button></div>
+  return <>
+      <div className="platform-title"><div><h1>Организации</h1></div><button type="button" className="platform-button" onClick={() => { setShowCreate(true); setSelectedId(''); setDetail(null); setError('') }}><FiPlus /> Добавить школу</button></div>
       <div className="platform-stats"><div><strong>{schools.length}</strong><span>Школ</span></div><div><strong>{totals.groups}</strong><span>Групп</span></div><div><strong>{totals.students}</strong><span>Учеников</span></div></div>
       {error && <div className="platform-error" role="alert">{error}</div>}
       <div className="platform-content"><section className="platform-list" aria-label="Список школ"><div className="platform-list-head"><h2>Все школы</h2><label><FiSearch /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Найти школу" aria-label="Найти школу" /></label></div>
@@ -114,7 +129,6 @@ export default function PlatformPage() {
         : <section className="platform-panel platform-placeholder"><span className="platform-kicker">ОБЗОР</span><h2>Выберите школу</h2><p>Откройте её состав и настройки доступа.</p></section>}
       </aside></div>
       <section className="platform-inquiries" aria-label="Заявки на подключение"><div className="platform-inquiries-head"><h2>Заявки школ</h2><span>{inquiries.length}</span></div>{inquiries.length ? inquiries.map(item => <article key={item.id} className="platform-inquiry"><div><h3>{item.schoolName}</h3><p>{item.contactName}{item.city ? ` · ${item.city}` : ''}</p>{item.message && <p>{item.message}</p>}</div><div className="platform-inquiry-contacts">{item.phone && <a href={`tel:${item.phone.replace(/[^+\d]/g, '')}`}>{item.phone}</a>}{item.email && <a href={`mailto:${item.email}`}>{item.email}</a>}<small>{new Date(item.createdAt).toLocaleDateString('ru-RU')}</small></div></article>) : <p className="platform-empty">Заявок пока нет</p>}</section>
-    </main>
     <Credentials account={secret} onClose={() => setSecret(null)} />
-  </div>
+  </>
 }

@@ -71,7 +71,7 @@ export default function MobileNavigation() {
   }
 
   const links = user?.role === 'platform_admin' ? [
-    { to: '/platform', label: 'Школы', icon: FiGrid },
+    { to: '/platform', label: 'Управление', icon: FiGrid },
     { to: '/practice', label: 'Практика чтения', icon: FiMic },
   ] : user?.role === 'reader' ? [
     { to: '/', label: 'Главная', icon: FiHome },

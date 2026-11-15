@@ -30,3 +30,30 @@
   .recitation-header{position:sticky;top:0;z-index:30;margin:0 -14px;padding:0 14px;background:#f4f1e9}
 }
 .recitation-privacy{margin:14px auto 0;max-width:560px;text-align:center;color:#68746e;font-size:12px;line-height:1.5}.recitation-privacy a{color:#0c6255;text-decoration:underline;text-underline-offset:2px}
+
+.recitation-access {
+  margin: 0 0 8px;
+  color: #405e58;
+  font-size: 13px;
+  text-align: center;
+}
+.recitation-access button, .recitation-retry {
+  border: 0;
+  background: transparent;
+  color: #0c6255;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.recitation-subscribe {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 18px;
+  border-radius: 13px;
+  background: #0c6255;
+  color: white;
+  font-weight: 650;
+  text-decoration: none;
+}

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { checkPracticeHealth, practiceErrorMessage, recognizeReading } from '../api/practiceApi.js'
 import { latestQueue, wavBlob, wavWindowBlob } from './pcm.js'
 import { combineResults, retainConfirmedWords } from './liveTracking.js'
 
@@ -7,7 +8,7 @@ const LIVE_WINDOW_SECONDS = 12
 const CONFIRM_INTERVAL_SECONDS = 8
 const MIN_LIVE_AUDIO_SECONDS = 3
 
-export default function useLiveRecitation(selection) {
+export default function useLiveRecitation(selection, refreshAccess) {
   const [phase, setPhase] = useState('idle')
   const [result, setResult] = useState(null)
   const [error, setError] = useState('')
@@ -16,15 +17,6 @@ export default function useLiveRecitation(selection) {
   const [processing, setProcessing] = useState(false)
   const [finalAudio, setFinalAudio] = useState(null)
   const session = useRef(null)
-  function endpoint(path) {
-    const query = new URLSearchParams({
-      surah: String(selection.surah),
-      ayah_from: String(selection.ayahFrom),
-      ayah_to: String(selection.ayahTo),
-      session: session.current?.id || '',
-    })
-    return `${path}?${query}`
-  }
   function dispose(run) {
     if (!run) return
     run.closed = true
@@ -58,6 +50,7 @@ export default function useLiveRecitation(selection) {
     if (run.closed) return
     run.node.disconnect(); void run.context.close().catch(() => {})
     const blob = wavBlob(run.chunks, run.rate)
+    run.finalBlob = blob
     setFinalAudio(blob)
     run.queue.close()
     run.confirmQueue.close()
@@ -73,11 +66,12 @@ export default function useLiveRecitation(selection) {
     try {
       if (!navigator.mediaDevices?.getUserMedia || !window.AudioContext || !window.AudioWorkletNode) throw new Error('Микрофон недоступен. Откройте сайт в Chrome или загрузите запись.')
       run.controller = new AbortController()
-      const timeout = setTimeout(() => run.controller.abort(), 5000)
-      let health
-      try { health = await fetch('/ai-api/health', { signal: run.controller.signal }) }
-      finally { clearTimeout(timeout) }
-      if (!health.ok) throw new Error('Запустите локальный AI-сервис и попробуйте ещё раз.')
+      try {
+        await checkPracticeHealth(run.controller.signal)
+      } catch (err) {
+        if (err.response?.status === 402) void refreshAccess()
+        throw new Error(practiceErrorMessage(err))
+      }
       if (run.closed) return
       const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true }, video: false })
       if (run.closed) { stream.getTracks().forEach(track => track.stop()); return }
@@ -95,20 +89,15 @@ export default function useLiveRecitation(selection) {
         run.inflight += 1; setProcessing(true)
         const controller = new AbortController()
         run.controllers.add(controller)
-        const requestTimeout = setTimeout(() => controller.abort(), 90000)
         try {
-          const path = endpoint(final ? '/ai-api/listen/final' : confirm ? '/ai-api/confirm' : '/ai-api/listen')
-          const url = seq === undefined ? path : `${path}&seq=${seq}`
-          const response = await fetch(url, {
-            method: 'POST', body: blob, signal: controller.signal,
-            headers: { 'Content-Type': 'audio/wav', 'X-Al-Qalam-Test': '1' },
+          const data = await recognizeReading({
+            stage: final ? 'listen/final' : confirm ? 'confirm' : 'listen',
+            selection, attemptId: run.id, seq, audio: blob, signal: controller.signal,
           })
-          const data = await response.json().catch(() => null)
-          if (!response.ok) {
-            if (!final && [422, 429].includes(response.status)) return
-            throw new Error(data?.error || 'Не удалось связаться с AI-сервисом.')
+          if (!run.closed && !final && !run.counted && data.transcript?.trim()) {
+            run.counted = true
+            void refreshAccess()
           }
-          if (!data?.tracking) throw new Error('Перезапустите AI-сервис: нужна обновлённая версия.')
           if (!run.closed && (final || !run.stopping)) {
             if (final) setResult(retainConfirmedWords(data, run.previewResult, run.confirmResult))
             else {
@@ -121,11 +110,19 @@ export default function useLiveRecitation(selection) {
           if (final && !run.closed) setPhase('done')
         } catch (err) {
           if (!run.closed && (final || !run.stopping)) {
-            setError(err.name === 'AbortError' ? 'Распознавание заняло слишком много времени.' : err.message)
+            const status = err.response?.status
+            if (!final && [422, 429].includes(status)) return
+            if (!final && status === 402) {
+              dispose(run)
+              setProcessing(false)
+              setPhase('idle')
+              void refreshAccess()
+            }
+            setError(practiceErrorMessage(err))
             if (final) setPhase('done')
           }
         } finally {
-          clearTimeout(requestTimeout)
+          if (final && !run.closed) void refreshAccess()
           run.controllers.delete(controller)
           run.inflight -= 1
           if (!run.closed) setProcessing(run.inflight > 0)
@@ -169,5 +166,12 @@ export default function useLiveRecitation(selection) {
       setError(err.name === 'NotAllowedError' ? 'Разрешите доступ к микрофону в настройках браузера.' : err.name === 'NotFoundError' ? 'Микрофон не найден.' : err.name === 'AbortError' ? 'AI-сервис не отвечает. Запустите его и повторите.' : err.message)
     }
   }
-  return { phase, result, error, seconds, level, processing, finalAudio, start, stop, reset }
+  function retryFinal() {
+    const run = session.current
+    if (!run?.finalBlob || run.closed || run.inflight || phase !== 'done') return
+    setError('')
+    setPhase('finishing')
+    void run.send({ blob: run.finalBlob, final: true })
+  }
+  return { retryFinal, phase, result, error, seconds, level, processing, finalAudio, start, stop, reset }
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -80,6 +81,12 @@ func main() {
 
 	authHandler := handlers.NewAuthHandler(authService, logger)
 	readerHandler := handlers.NewReaderHandler(readerService, logger)
+	practiceHandler := handlers.NewPracticeHandler(repository.NewPracticeRepository(conn), logger, cfg.AIServiceURL)
+	payments := &handlers.PaymentHandler{DB: conn, Shop: os.Getenv("YOOKASSA_SHOP_ID"), Key: os.Getenv("YOOKASSA_SECRET_KEY"), Site: os.Getenv("APP_PUBLIC_URL"), Client: &http.Client{Timeout: 20 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}
+	if cfg.AppEnv == "production" {
+		payments.Key = ""
+	}
+	platformReaders := handlers.NewPlatformReadersHandler(conn, logger)
 	inquiryHandler := handlers.NewInquiryHandler(conn, logger, handlers.InquiryMailConfig{Host: cfg.MailHost, Port: cfg.MailPort, User: cfg.MailUser, Password: cfg.MailPassword, From: cfg.MailFrom, To: cfg.InquiryNotifyTo})
 	platformHandler := handlers.NewPlatformHandler(platformService, logger)
 	groupHandler := handlers.NewGroupHandler(groupService, logger)
@@ -95,6 +102,9 @@ func main() {
 		jwtManager,
 		authHandler,
 		readerHandler,
+		practiceHandler,
+		payments,
+		platformReaders,
 		inquiryHandler,
 		platformHandler,
 		groupHandler,

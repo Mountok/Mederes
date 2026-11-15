@@ -3,6 +3,8 @@ import { Link, NavLink, useSearchParams } from 'react-router-dom'
 import { FiArrowLeft, FiMic, FiSquare, FiUpload, FiRotateCcw, FiVolume2, FiGrid, FiBookOpen, FiClipboard, FiHome, FiLogIn, FiChevronDown, FiUser } from 'react-icons/fi'
 import useLiveRecitation from '../audio/useLiveRecitation.js'
 import useAyahAudio from '../audio/useAyahAudio.js'
+import { practiceErrorMessage, recognizeReading } from '../api/practiceApi.js'
+import { useReaderAccess } from '../auth/useReaderAccess.js'
 import { getSurahArabic, getSurahs } from '../api/quranApi.js'
 import { getHomeworkById, submitHomework } from '../api/mockApi.js'
 import { useAuth } from '../auth/useAuth.jsx'
@@ -30,7 +32,8 @@ export default function AiTestPage() {
   const [ayahTo, setAyahTo] = useState(4)
   const [catalogLoading, setCatalogLoading] = useState(true)
   const [catalogError, setCatalogError] = useState('')
-  const live = useLiveRecitation({ surah: selectedSurah, ayahFrom, ayahTo })
+  const quota = useReaderAccess(user)
+  const live = useLiveRecitation({ surah: selectedSurah, ayahFrom, ayahTo }, quota.refresh)
   const reference = useAyahAudio(selectedSurah)
   const [uploaded, setUploaded] = useState(null)
   const [uploadedFile, setUploadedFile] = useState(null)
@@ -38,10 +41,12 @@ export default function AiTestPage() {
   const [loading, setLoading] = useState(false)
   const [uploadError, setUploadError] = useState('')
   const request = useRef(null)
+  const uploadAttempt = useRef(null)
   const result = uploaded || live.result
   const tracking = result?.tracking
   const active = ['requesting', 'listening', 'finishing'].includes(live.phase)
   const error = uploadError || live.error
+  const paywall = quota.exhausted && !active && !loading
   const assignmentReady = !assignmentId || !!assignment
   useEffect(() => {
     const audio = uploadedFile || live.finalAudio
@@ -105,15 +110,8 @@ export default function AiTestPage() {
   function reset() {
     reference.stop()
     request.current?.abort()
+    uploadAttempt.current = null
     live.reset(); setUploaded(null); setUploadedFile(null); setUploadError('')
-  }
-  function requestUrl(path) {
-    const query = new URLSearchParams({
-      surah: String(selectedSurah),
-      ayah_from: String(ayahFrom),
-      ayah_to: String(ayahTo),
-    })
-    return `${path}?${query}`
   }
   function changeSurah(event) {
     const number = Number(event.target.value)
@@ -134,32 +132,45 @@ export default function AiTestPage() {
     reset()
     setAyahTo(Number(event.target.value))
   }
-  async function upload(event) {
+  async function checkFile(file, attemptId) {
+    if (request.current && !request.current.signal.aborted) return
+    setLoading(true)
+    setUploadError('')
+    const controller = new AbortController()
+    request.current = controller
+    try {
+      const data = await recognizeReading({
+        stage: 'listen/final', selection: { surah: selectedSurah, ayahFrom, ayahTo },
+        audio: file, attemptId, signal: controller.signal,
+      })
+      if (!controller.signal.aborted) setUploaded(data)
+    } catch (err) {
+      if (!controller.signal.aborted) setUploadError(practiceErrorMessage(err))
+    } finally {
+      if (request.current === controller && !controller.signal.aborted) {
+        request.current = null
+        setLoading(false)
+        void quota.refresh()
+      }
+    }
+  }
+  function upload(event) {
     const next = event.target.files?.[0]
     event.target.value = ''
-    if (!next || !assignmentReady) return
+    if (!next || !assignmentReady || !quota.canStart) return
     reset()
     if (!next.size || next.size > 20 * 1024 * 1024) { setUploadError('Нужен аудиофайл до 20 МБ.'); return }
     setUploadedFile(next)
-    setLoading(true)
-    const controller = new AbortController()
-    request.current = controller
-    const timeout = setTimeout(() => controller.abort(), 90000)
-    try {
-      const response = await fetch(requestUrl('/ai-api/listen/final'), { method: 'POST', body: next, signal: controller.signal,
-        headers: { 'X-Al-Qalam-Test': '1', 'Content-Type': 'application/octet-stream' } })
-      const data = await response.json().catch(() => null)
-      if (!response.ok) throw new Error(data?.error || 'AI-сервис недоступен. Инструкция — внизу страницы.')
-      if (!data?.tracking) throw new Error('Перезапустите AI-сервис, чтобы применить обновление.')
-      setUploaded(data)
-    } catch (err) { setUploadError(err.name === 'AbortError' ? 'Время ожидания истекло.' : err.message) }
-    finally { clearTimeout(timeout); setLoading(false) }
+    uploadAttempt.current = crypto.randomUUID()
+    void checkFile(next, uploadAttempt.current)
   }
   function listen(number) {
     if (active) return
     void reference.play(number)
   }
   function startReading() {
+    if (!quota.canStart) return
+    uploadAttempt.current = null
     reference.stop()
     setUploaded(null); setUploadedFile(null); setUploadError('')
     void live.start()
@@ -216,8 +227,21 @@ export default function AiTestPage() {
         {reference.error && <p className="recitation-error" role="alert">{reference.error}</p>}
         <div className={`recitation-controls ${error ? 'has-error' : ''}`}>
           {status ? <div className="recitation-status" role="status" aria-live="polite"><span className={`recitation-indicator ${active ? 'is-active' : ''}`} />{status}</div> : null}
-          <div className="recitation-action-row"><span className="recitation-timer">{String(Math.floor(live.seconds/60)).padStart(2,'0')}:{String(live.seconds%60).padStart(2,'0')}</span><button className={`recitation-primary ${live.phase === 'listening' ? 'is-recording' : ''}`} disabled={loading || catalogLoading || !selectionReady || !assignmentReady || submitted || ['requesting','finishing'].includes(live.phase)} onClick={() => { if (live.phase === 'listening') void live.stop(); else startReading() }}>{live.phase === 'listening' ? <FiSquare /> : <FiMic />}<span className="recitation-primary-label">{live.phase === 'listening' ? 'Завершить' : 'Начать чтение'}</span></button><span className="recitation-meter" aria-label={`Уровень микрофона ${Math.round(live.level*100)} процентов`}>{[0.6,1,0.75,0.9,0.5].map((scale,i) => <i key={i} style={{height:`${4+live.level*22*scale}px`}} />)}</span></div>
-          <div className="recitation-secondary"><label className={active || loading || catalogLoading || !selectionReady || !assignmentReady || submitted ? 'is-disabled' : ''}><FiUpload />Загрузить запись<input type="file" accept="audio/*,.mp3,.wav,.m4a,.webm,.ogg" disabled={active || loading || catalogLoading || !selectionReady || !assignmentReady || submitted} onChange={upload} /></label>{(result || error) && !active && !loading && !submitted && <button type="button" onClick={reset}><FiRotateCcw />Заново</button>}</div>
+          {user?.role === 'reader' && <div className="recitation-access" aria-live="polite">
+            {quota.error ? <>{quota.error} <button type="button" onClick={quota.refresh}>Обновить</button></>
+              : !quota.access ? 'Проверяем доступ…'
+              : quota.access.subscribed ? 'Подписка активна'
+              : paywall ? 'Бесплатные проверки закончились'
+              : `Бесплатных проверок осталось: ${quota.access.remaining} из ${quota.access.trialLimit}`}
+          </div>}
+          {paywall ? <Link className="recitation-subscribe" to="/account?plans=1">Посмотреть подписку</Link> : <>
+          <div className="recitation-action-row"><span className="recitation-timer">{String(Math.floor(live.seconds/60)).padStart(2,'0')}:{String(live.seconds%60).padStart(2,'0')}</span><button className={`recitation-primary ${live.phase === 'listening' ? 'is-recording' : ''}`} disabled={(!quota.canStart && !active) || loading || catalogLoading || !selectionReady || !assignmentReady || submitted || ['requesting','finishing'].includes(live.phase)} onClick={() => { if (live.phase === 'listening') void live.stop(); else startReading() }}>{live.phase === 'listening' ? <FiSquare /> : <FiMic />}<span className="recitation-primary-label">{live.phase === 'listening' ? 'Завершить' : 'Начать чтение'}</span></button><span className="recitation-meter" aria-label={`Уровень микрофона ${Math.round(live.level*100)} процентов`}>{[0.6,1,0.75,0.9,0.5].map((scale,i) => <i key={i} style={{height:`${4+live.level*22*scale}px`}} />)}</span></div>
+          <div className="recitation-secondary"><label className={!quota.canStart || active || loading || catalogLoading || !selectionReady || !assignmentReady || submitted ? 'is-disabled' : ''}><FiUpload />Загрузить запись<input type="file" accept="audio/*,.mp3,.wav,.m4a,.webm,.ogg" disabled={!quota.canStart || active || loading || catalogLoading || !selectionReady || !assignmentReady || submitted} onChange={upload} /></label>{(result || error) && !active && !loading && !submitted && <button type="button" onClick={reset}><FiRotateCcw />Заново</button>}</div>
+          </>}
+          {error && !active && !loading && (live.finalAudio || uploadAttempt.current) && <button type="button" className="recitation-retry" onClick={() => {
+            if (uploadedFile && uploadAttempt.current) void checkFile(uploadedFile, uploadAttempt.current)
+            else live.retryFinal()
+          }}>Повторить проверку этой записи</button>}
           <div className="recitation-legend" aria-label="Значение подсветки"><span><i className="is-match" />Совпало с текстом</span><span><i className="is-review" />Перепроверить слово</span></div>
           {error && <p className="recitation-error" role="alert">{error}</p>}
           {live.phase === 'requesting' && <button type="button" className="recitation-cancel" onClick={reset}>Отменить</button>}

@@ -29,3 +29,18 @@ export async function resetPlatformAccess(schoolId, userId) {
   const { data } = await api.post(`/platform/schools/${schoolId}/users/${userId}/access/reset`)
   return data.account
 }
+
+export async function listPlatformReaders(query, offset, signal) {
+  const { data } = await api.get('/platform/readers', { params: { q: query, offset }, signal })
+  return data
+}
+
+export async function resetReaderTrial(readerId) {
+  const { data } = await api.post(`/platform/readers/${readerId}/trial/reset`)
+  return data.reader
+}
+
+export async function setReaderSubscription(readerId, months, expectedUntil) {
+  const { data } = await api.put(`/platform/readers/${readerId}/subscription`, { months, expectedUntil })
+  return data.reader
+}

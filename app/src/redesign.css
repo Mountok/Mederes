@@ -703,3 +703,19 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
   .reader-plan-dialog { padding: 22px; border-radius: 19px; }
 }
 @media (max-width: 410px) { .reader-account-next { padding: 17px; gap: 12px; } .reader-account-next p { font-size: 12px; } .reader-account-access { padding: 26px; } .reader-plan-option { gap: 10px; padding: 12px; } .reader-plan-option b { font-size: 17px; } }
+
+.reader-payment-status { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; padding: 16px 20px; border-radius: 14px; background: var(--surface-alt); color: var(--brand-dark); }
+.reader-payment-status button { appearance: none; border: 0; background: transparent; font: inherit; color: inherit; text-decoration: underline; cursor: pointer; }
+
+.reader-profile-choices { display: grid; gap: 10px; }
+.reader-profile-choices > * {
+  display: grid; grid-template-columns: 22px 1fr 18px; align-items: center; gap: 14px;
+  padding: 17px 15px; border: 0; border-radius: 14px; background: var(--surface-alt);
+  color: var(--brand-dark); font: inherit; text-align: left; text-decoration: none; cursor: pointer;
+}
+.reader-profile-choices > :is(:hover, :focus-visible) { background: var(--brand-soft, #e4f2ef); }
+.reader-profile-choices svg { width: 100%; height: auto; }
+.reader-profile-choices strong, .reader-profile-choices small { display: block; }
+.reader-profile-choices small { margin-top: 4px; font-size: 13px; line-height: 1.45; color: var(--text-soft); }
+.reader-profile-back { display: inline-flex; align-items: center; gap: 6px; margin: 18px 0 0; padding: 5px 0; border: 0; background: none; color: var(--brand); font: inherit; font-size: 13px; cursor: pointer; }
+.reader-profile-back + h2 { margin-top: 8px; }

@@ -81,7 +81,7 @@ func (h *InquiryHandler) Create(c *gin.Context) {
 			return
 		}
 	}
-	_, err := h.db.ExecContext(c.Request.Context(), `INSERT INTO school_inquiries(id,school_name,contact_name,city,phone,email,message,consent_at,consent_version) VALUES($1,$2,$3,$4,$5,$6,$7,NOW(),'2026-11-06')`, uuid.NewString(), request.SchoolName, request.ContactName, request.City, request.Phone, request.Email, request.Message)
+	_, err := h.db.ExecContext(c.Request.Context(), `INSERT INTO school_inquiries(id,school_name,contact_name,city,phone,email,message,consent_at,consent_version) VALUES($1,$2,$3,$4,$5,$6,$7,NOW(),'2026-11-15')`, uuid.NewString(), request.SchoolName, request.ContactName, request.City, request.Phone, request.Email, request.Message)
 	if err != nil {
 		respondError(c, h.logger, models.InternalError("Не удалось отправить заявку", err))
 		return

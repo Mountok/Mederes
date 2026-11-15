@@ -16,6 +16,9 @@ func Setup(
 	jwtManager *auth.JWTManager,
 	authHandler *handlers.AuthHandler,
 	readerHandler *handlers.ReaderHandler,
+	practiceHandler *handlers.PracticeHandler,
+	payments *handlers.PaymentHandler,
+	platformReaders *handlers.PlatformReadersHandler,
 	inquiryHandler *handlers.InquiryHandler,
 	platformHandler *handlers.PlatformHandler,
 	groupHandler *handlers.GroupHandler,
@@ -38,6 +41,7 @@ func Setup(
 
 	api := router.Group("/api")
 	api.POST("/auth/login", authHandler.Login)
+	api.POST("/payments/yookassa", payments.Notify)
 	api.POST("/readers/register", readerHandler.Register)
 	api.POST("/readers/login", readerHandler.Login)
 	api.POST("/school-inquiries", inquiryHandler.Create)
@@ -51,11 +55,23 @@ func Setup(
 	protected.Use(middleware.AuthMiddleware(jwtManager))
 
 	protected.GET("/me", authHandler.Me)
+	protected.POST("/readers/payments", middleware.RequireRoles("reader"), payments.Create)
+	protected.POST("/readers/payments/:id/check", middleware.RequireRoles("reader"), payments.Check)
+	protected.GET("/readers/access", middleware.RequireRoles("reader"), practiceHandler.Access)
+	practice := protected.Group("/practice")
+	practice.Use(middleware.RequireRoles("reader", "teacher", "staff", "student", "parent", "platform_admin"))
+	practice.GET("/health", practiceHandler.Health)
+	for _, operation := range []string{"listen", "confirm", "listen/final", "analyze"} {
+		practice.POST("/"+operation, practiceHandler.Recognize(operation))
+	}
 	schoolUsers := protected.Group("/")
 	schoolUsers.Use(middleware.RequireRoles("teacher", "staff", "parent", "student"))
 	platform := protected.Group("/platform")
 	platform.Use(middleware.RequireRoles("platform_admin"))
 	platform.GET("/schools", platformHandler.List)
+	platform.GET("/readers", platformReaders.List)
+	platform.POST("/readers/:id/trial/reset", platformReaders.ResetTrial)
+	platform.PUT("/readers/:id/subscription", platformReaders.SetSubscription)
 	platform.GET("/inquiries", inquiryHandler.List)
 	platform.POST("/schools", platformHandler.Create)
 	platform.GET("/schools/:id", platformHandler.Detail)

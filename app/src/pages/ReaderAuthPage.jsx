@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { FiArrowLeft, FiArrowRight, FiBookOpen, FiUsers } from 'react-icons/fi'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth.jsx'
 import PublicFooter from '../components/PublicFooter.jsx'
@@ -6,7 +7,7 @@ import PublicFooter from '../components/PublicFooter.jsx'
 export default function ReaderAuthPage() {
   const { user, readerAuth } = useAuth()
   const navigate = useNavigate()
-  const [mode, setMode] = useState('register')
+  const [mode, setMode] = useState('choose')
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -33,9 +34,24 @@ export default function ReaderAuthPage() {
     <header className="reader-auth-header"><Link className="reader-auth-brand" to="/"><img src="/logo_al-qalam.png" alt="" />Al-Qalam</Link><Link to="/login">Вход в журнал</Link></header>
     <main className="reader-auth-main">
       <div className="reader-auth-intro"><p lang="ar" dir="rtl">اقْرَأْ</p><h1>Время читать.</h1><span>Выберите суру, слушайте по аятам и читайте вслух. Слова подсветятся по мере распознавания.</span></div>
-      <section className="reader-auth-card" aria-label="Личный вход">
-        <div className="reader-auth-switch" role="group" aria-label="Регистрация или вход"><button type="button" className={mode === 'register' ? 'is-active' : ''} onClick={() => { setMode('register'); setError('') }}>Создать аккаунт</button><button type="button" className={mode === 'login' ? 'is-active' : ''} onClick={() => { setMode('login'); setError('') }}>Войти</button></div>
-        <h2>{mode === 'register' ? 'Начните практику' : 'С возвращением'}</h2>
+      <section className="reader-auth-card" aria-label="Регистрация и вход">
+        <div className="reader-auth-switch" role="group" aria-label="Регистрация или вход">
+          <button type="button" className={mode !== 'login' ? 'is-active' : ''} aria-pressed={mode !== 'login'} disabled={busy} onClick={() => { setMode('choose'); setError('') }}>Регистрация</button>
+          <button type="button" className={mode === 'login' ? 'is-active' : ''} aria-pressed={mode === 'login'} disabled={busy} onClick={() => { setMode('login'); setError('') }}>Вход</button>
+        </div>
+        {mode === 'choose' ? <>
+          <h2>Выберите профиль</h2>
+          <div className="reader-profile-choices">
+            <button type="button" onClick={() => setMode('register')}>
+              <FiBookOpen aria-hidden="true" /><span><strong>Личный</strong><small>Практика чтения · 3 бесплатные проверки</small></span><FiArrowRight aria-hidden="true" />
+            </button>
+            <Link to="/for-schools">
+              <FiUsers aria-hidden="true" /><span><strong>Организация</strong><small>Подать заявку на журнал для школы или медресе</small></span><FiArrowRight aria-hidden="true" />
+            </Link>
+          </div>
+        </> : <>
+          {mode === 'register' && <button type="button" className="reader-profile-back" disabled={busy} onClick={() => setMode('choose')}><FiArrowLeft aria-hidden="true" />Тип профиля</button>}
+          <h2>{mode === 'register' ? 'Личный профиль' : 'Вход в личный профиль'}</h2>
         <form onSubmit={submit}>
           {mode === 'register' && <label>Как к вам обращаться<input autoComplete="name" required maxLength="80" value={name} onChange={event => setName(event.target.value)} /></label>}
           <label>Email<input type="email" autoComplete="email" required value={email} onChange={event => setEmail(event.target.value)} /></label>
@@ -45,6 +61,7 @@ export default function ReaderAuthPage() {
           {error && <p className="reader-auth-error" role="alert">{error}</p>}
           <button className="reader-auth-submit" type="submit" disabled={busy}>{busy ? 'Подождите…' : mode === 'register' ? 'Создать аккаунт' : 'Войти в практику'}</button>
         </form>
+        </>}
       </section>
     </main>
     <PublicFooter />
