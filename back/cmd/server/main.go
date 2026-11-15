@@ -55,6 +55,7 @@ func main() {
 	jwtManager := auth.NewJWTManager(cfg.JWTSecret, 24*time.Hour)
 
 	authRepo := repository.NewAuthRepository(conn)
+	readerRepo := repository.NewReaderRepository(conn)
 	platformRepo := repository.NewPlatformRepository(conn)
 	groupRepo := repository.NewGroupRepository(conn)
 	studentRepo := repository.NewStudentRepository(conn)
@@ -67,7 +68,8 @@ func main() {
 	liveHub := realtime.NewLiveHub()
 	accessService := services.NewAccessService(groupRepo, studentRepo, staffRepo)
 
-	authService := services.NewAuthService(authRepo, jwtManager)
+	readerService := services.NewReaderService(readerRepo, jwtManager)
+	authService := services.NewAuthService(authRepo, jwtManager).WithReaders(readerService)
 	platformService := services.NewPlatformService(platformRepo)
 	groupService := services.NewGroupService(groupRepo, studentRepo, staffRepo, lessonRepo, attendanceRepo, accessService)
 	studentService := services.NewStudentService(studentRepo, groupRepo, accessService)
@@ -77,6 +79,8 @@ func main() {
 	liveService := services.NewLiveService(liveRepo, groupRepo, liveKitClient)
 
 	authHandler := handlers.NewAuthHandler(authService, logger)
+	readerHandler := handlers.NewReaderHandler(readerService, logger)
+	inquiryHandler := handlers.NewInquiryHandler(conn, logger, handlers.InquiryMailConfig{Host: cfg.MailHost, Port: cfg.MailPort, User: cfg.MailUser, Password: cfg.MailPassword, From: cfg.MailFrom, To: cfg.InquiryNotifyTo})
 	platformHandler := handlers.NewPlatformHandler(platformService, logger)
 	groupHandler := handlers.NewGroupHandler(groupService, logger)
 	studentHandler := handlers.NewStudentHandler(studentService, logger)
@@ -90,6 +94,8 @@ func main() {
 		logger,
 		jwtManager,
 		authHandler,
+		readerHandler,
+		inquiryHandler,
 		platformHandler,
 		groupHandler,
 		studentHandler,

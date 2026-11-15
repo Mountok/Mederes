@@ -14,8 +14,9 @@ import (
 )
 
 type AuthService struct {
-	authRepo   repository.AuthRepository
-	jwtManager *auth.JWTManager
+	authRepo      repository.AuthRepository
+	readerService *ReaderService
+	jwtManager    *auth.JWTManager
 }
 
 func NewAuthService(authRepo repository.AuthRepository, jwtManager *auth.JWTManager) *AuthService {
@@ -23,6 +24,11 @@ func NewAuthService(authRepo repository.AuthRepository, jwtManager *auth.JWTMana
 		authRepo:   authRepo,
 		jwtManager: jwtManager,
 	}
+}
+
+func (s *AuthService) WithReaders(readers *ReaderService) *AuthService {
+	s.readerService = readers
+	return s
 }
 
 func (s *AuthService) Login(ctx context.Context, request models.LoginRequest) (*models.LoginResponse, error) {
@@ -65,7 +71,14 @@ func (s *AuthService) Login(ctx context.Context, request models.LoginRequest) (*
 	}, nil
 }
 
-func (s *AuthService) Me(ctx context.Context, userID string, schoolID string) (*models.CurrentUserResponse, error) {
+func (s *AuthService) Me(ctx context.Context, userID string, schoolID string, role string) (*models.CurrentUserResponse, error) {
+	if role == "reader" {
+		reader, err := s.readerService.Me(ctx, userID)
+		if err != nil {
+			return nil, err
+		}
+		return &models.CurrentUserResponse{User: reader.User}, nil
+	}
 	user, err := s.authRepo.GetByID(ctx, userID, schoolID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -82,7 +95,7 @@ func (s *AuthService) Me(ctx context.Context, userID string, schoolID string) (*
 			Label:     user.Label,
 			StudentID: user.StudentID,
 		},
-		School: models.SchoolInfo{
+		School: &models.SchoolInfo{
 			ID:   user.SchoolID,
 			Name: user.SchoolName,
 		},

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { FiArrowRight, FiCheck, FiCopy, FiLogOut, FiPlus, FiRefreshCw, FiSearch, FiX } from 'react-icons/fi'
 import { useAuth } from '../auth/useAuth.jsx'
-import { createPlatformSchool, getPlatformSchool, listPlatformSchools, renamePlatformSchool, resetPlatformAccess } from '../api/platformApi.js'
+import { MobileMenuButton } from '../components/MobileNavigation.jsx'
+import { createPlatformSchool, getPlatformSchool, listPlatformInquiries, listPlatformSchools, renamePlatformSchool, resetPlatformAccess } from '../api/platformApi.js'
 import './PlatformPage.css'
 
 function errorText(error) {
@@ -30,6 +31,7 @@ function Credentials({ account, onClose }) {
 export default function PlatformPage() {
   const { user, logout } = useAuth()
   const [schools, setSchools] = useState([])
+  const [inquiries, setInquiries] = useState([])
   const [selectedId, setSelectedId] = useState('')
   const [detail, setDetail] = useState(null)
   const [query, setQuery] = useState('')
@@ -44,6 +46,12 @@ export default function PlatformPage() {
   useEffect(() => {
     let active = true
     listPlatformSchools().then(items => { if (active) setSchools(items) }).catch(err => { if (active) setError(errorText(err)) }).finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
+  }, [])
+
+  useEffect(() => {
+    let active = true
+    listPlatformInquiries().then(items => { if (active) setInquiries(items) }).catch(err => { if (active) setError(errorText(err)) })
     return () => { active = false }
   }, [])
 
@@ -92,7 +100,7 @@ export default function PlatformPage() {
   }
 
   return <div className="platform-page">
-    <header className="platform-topbar"><a href="/platform" className="platform-brand"><img src="/logo_al-qalam.png" alt="" />Al-Qalam <span>Управление</span></a><div><span>{user?.label}</span><button type="button" onClick={logout}><FiLogOut /> Выйти</button></div></header>
+    <header className="platform-topbar"><a href="/platform" className="platform-brand"><img src="/logo_al-qalam.png" alt="" />Al-Qalam <span>Управление</span></a><div><span>{user?.label}</span><button type="button" onClick={logout}><FiLogOut /> Выйти</button><MobileMenuButton /></div></header>
     <main className="platform-main">
       <div className="platform-title"><div><span className="platform-kicker">ПАНЕЛЬ ПЛАТФОРМЫ</span><h1>Школы</h1><p>Учётные записи, состав и доступ в одном месте.</p></div><button type="button" className="platform-button" onClick={() => { setShowCreate(true); setSelectedId(''); setDetail(null); setError('') }}><FiPlus /> Добавить школу</button></div>
       <div className="platform-stats"><div><strong>{schools.length}</strong><span>Школ</span></div><div><strong>{totals.groups}</strong><span>Групп</span></div><div><strong>{totals.students}</strong><span>Учеников</span></div></div>
@@ -105,6 +113,7 @@ export default function PlatformPage() {
         : detail ? <section className="platform-panel"><div className="platform-panel-head"><span className="platform-kicker">ШКОЛА</span><button className="platform-icon-button" type="button" onClick={() => { setSelectedId(''); setDetail(null) }} aria-label="Закрыть"><FiX /></button></div><h2>{detail.school.name}</h2><p>{detail.school.groupCount} групп · {detail.school.studentCount} учеников</p><form className="platform-form platform-rename" onSubmit={saveName}><label>Название школы<input required maxLength="120" value={rename} onChange={event => setRename(event.target.value)} /></label><button type="submit" disabled={busy || rename.trim() === detail.school.name}>Сохранить название</button></form><div className="platform-users"><h3>Администраторы и преподаватели</h3>{detail.users.map(item => <div className="platform-user" key={item.id}><div><strong>{item.label}</strong><span>{item.role === 'teacher' ? 'Администратор школы' : 'Преподаватель'} · {item.login}</span></div><button type="button" disabled={busy} onClick={() => reset(item.id, item.label)} title="Сбросить пароль"><FiRefreshCw /><span>Новый пароль</span></button></div>)}</div><p className="platform-note">Учениками и занятиями управляет администратор своей школы. Пароли здесь не хранятся в открытом виде.</p></section>
         : <section className="platform-panel platform-placeholder"><span className="platform-kicker">ОБЗОР</span><h2>Выберите школу</h2><p>Откройте её состав и настройки доступа.</p></section>}
       </aside></div>
+      <section className="platform-inquiries" aria-label="Заявки на подключение"><div className="platform-inquiries-head"><h2>Заявки школ</h2><span>{inquiries.length}</span></div>{inquiries.length ? inquiries.map(item => <article key={item.id} className="platform-inquiry"><div><h3>{item.schoolName}</h3><p>{item.contactName}{item.city ? ` · ${item.city}` : ''}</p>{item.message && <p>{item.message}</p>}</div><div className="platform-inquiry-contacts">{item.phone && <a href={`tel:${item.phone.replace(/[^+\d]/g, '')}`}>{item.phone}</a>}{item.email && <a href={`mailto:${item.email}`}>{item.email}</a>}<small>{new Date(item.createdAt).toLocaleDateString('ru-RU')}</small></div></article>) : <p className="platform-empty">Заявок пока нет</p>}</section>
     </main>
     <Credentials account={secret} onClose={() => setSecret(null)} />
   </div>

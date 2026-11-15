@@ -88,6 +88,18 @@ export function AuthProvider({ children }) {
     }
   }
 
+  async function readerAuth(mode, payload) {
+    try {
+      const { data } = await api.post(mode === 'register' ? '/readers/register' : '/readers/login', payload)
+      const nextSession = { token: data.token, user: data.user, school: null }
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextSession))
+      setSession(nextSession)
+      return { ok: true }
+    } catch (error) {
+      return { ok: false, message: error?.response?.data?.error?.message ?? 'Не удалось связаться с сервером' }
+    }
+  }
+
   function logout() {
     window.localStorage.removeItem(STORAGE_KEY)
     setSession(null)
@@ -102,6 +114,7 @@ export function AuthProvider({ children }) {
       school,
       token: session?.token ?? null,
       login,
+      readerAuth,
       logout,
       isTeacher: user?.role === 'teacher',
       isStaff: user?.role === 'staff',

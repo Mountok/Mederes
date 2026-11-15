@@ -1,6 +1,7 @@
-import { FiArrowLeft, FiBookOpen, FiUserPlus, FiClipboard } from 'react-icons/fi'
+import { FiArrowLeft, FiBookOpen, FiUserPlus, FiClipboard, FiGrid, FiMic } from 'react-icons/fi'
 import { NavLink, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth.jsx'
+import { MobileMenuButton } from './MobileNavigation.jsx'
 
 function Navbar() {
   const location = useLocation()
@@ -18,6 +19,7 @@ function Navbar() {
             <p>{school?.name ?? 'Учебные группы'}</p>
           </div>
         </NavLink>
+        <MobileMenuButton />
 
         <div className="navbar-account">
           <span className="nav-role">{user?.label}</span>
@@ -26,10 +28,10 @@ function Navbar() {
       </div>
 
       <nav className="nav-links" aria-label="Основная навигация">
-        <NavLink className="nav-link" to="/ai-test">Практика чтения</NavLink>
-        <NavLink className="nav-link" to="/groups">Группы</NavLink>
+        <NavLink className="nav-link" to="/groups"><FiGrid />Группы</NavLink>
         {user?.role !== 'parent' && <NavLink className="nav-link" to="/homework"><FiClipboard /> Задания</NavLink>}
         <NavLink className="nav-link nav-link-quran" to="/quran"><FiBookOpen />Коран</NavLink>
+        <NavLink className="nav-link" to="/practice"><FiMic />Практика чтения</NavLink>
         {isTeacher && <NavLink className="nav-link" to="/staff"><FiUserPlus />Преподаватели</NavLink>}
       </nav>
 

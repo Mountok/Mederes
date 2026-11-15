@@ -28,6 +28,12 @@ type Config struct {
 	LiveKitSecret    string
 	HomeworkAudioDir string
 	AIServiceURL     string
+	MailHost         string
+	MailPort         string
+	MailUser         string
+	MailPassword     string
+	MailFrom         string
+	InquiryNotifyTo  string
 }
 
 func Load() (Config, error) {
@@ -52,6 +58,12 @@ func Load() (Config, error) {
 		LiveKitSecret:    getenv("LIVEKIT_API_SECRET", "secret"),
 		HomeworkAudioDir: getenv("HOMEWORK_AUDIO_DIR", "storage/homework"),
 		AIServiceURL:     getenv("AI_SERVICE_URL", "http://127.0.0.1:8001"),
+		MailHost:         os.Getenv("MAIL_HOST"),
+		MailPort:         getenv("MAIL_PORT", "465"),
+		MailUser:         os.Getenv("MAIL_USER"),
+		MailPassword:     os.Getenv("MAIL_PASSWORD"),
+		MailFrom:         os.Getenv("MAIL_FROM"),
+		InquiryNotifyTo:  os.Getenv("SCHOOL_INQUIRY_NOTIFY_EMAIL"),
 	}
 
 	if strings.TrimSpace(cfg.DBName) == "" || strings.TrimSpace(cfg.DBUser) == "" {

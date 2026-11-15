@@ -43,7 +43,7 @@ func (h *AuthHandler) Me(c *gin.Context) {
 		return
 	}
 
-	response, err := h.service.Me(c.Request.Context(), claims.UserID, claims.SchoolID)
+	response, err := h.service.Me(c.Request.Context(), claims.UserID, claims.SchoolID, claims.Role)
 	if err != nil {
 		respondError(c, h.logger, err)
 		return

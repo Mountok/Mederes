@@ -5,6 +5,11 @@ export async function listPlatformSchools() {
   return data.schools
 }
 
+export async function listPlatformInquiries() {
+  const { data } = await api.get('/platform/inquiries')
+  return data.inquiries
+}
+
 export async function getPlatformSchool(id) {
   const { data } = await api.get(`/platform/schools/${id}`)
   return data

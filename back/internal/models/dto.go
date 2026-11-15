@@ -135,7 +135,7 @@ type UpdateAttendanceAllRequest struct {
 
 type CurrentUserResponse struct {
 	User   UserInfo   `json:"user"`
-	School SchoolInfo `json:"school"`
+	School *SchoolInfo `json:"school,omitempty"`
 }
 
 type GroupDetailsResponse struct {

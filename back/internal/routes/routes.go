@@ -15,6 +15,8 @@ func Setup(
 	logger *logrus.Logger,
 	jwtManager *auth.JWTManager,
 	authHandler *handlers.AuthHandler,
+	readerHandler *handlers.ReaderHandler,
+	inquiryHandler *handlers.InquiryHandler,
 	platformHandler *handlers.PlatformHandler,
 	groupHandler *handlers.GroupHandler,
 	studentHandler *handlers.StudentHandler,
@@ -36,6 +38,9 @@ func Setup(
 
 	api := router.Group("/api")
 	api.POST("/auth/login", authHandler.Login)
+	api.POST("/readers/register", readerHandler.Register)
+	api.POST("/readers/login", readerHandler.Login)
+	api.POST("/school-inquiries", inquiryHandler.Create)
 	api.POST("/live/rooms/join", liveHandler.JoinRoom)
 	api.POST("/live/rooms/:id/token", liveHandler.GetToken)
 	api.GET("/live/rooms/:id/messages", liveHandler.ListMessages)
@@ -46,20 +51,23 @@ func Setup(
 	protected.Use(middleware.AuthMiddleware(jwtManager))
 
 	protected.GET("/me", authHandler.Me)
+	schoolUsers := protected.Group("/")
+	schoolUsers.Use(middleware.RequireRoles("teacher", "staff", "parent", "student"))
 	platform := protected.Group("/platform")
 	platform.Use(middleware.RequireRoles("platform_admin"))
 	platform.GET("/schools", platformHandler.List)
+	platform.GET("/inquiries", inquiryHandler.List)
 	platform.POST("/schools", platformHandler.Create)
 	platform.GET("/schools/:id", platformHandler.Detail)
 	platform.PATCH("/schools/:id", platformHandler.Rename)
 	platform.POST("/schools/:id/users/:userId/access/reset", platformHandler.ResetAccess)
-	protected.GET("/groups", groupHandler.List)
-	protected.GET("/groups/:id", groupHandler.GetByID)
-	protected.GET("/groups/:id/journal", groupHandler.GetJournal)
-	protected.GET("/lessons/:id", lessonHandler.GetByID)
-	protected.GET("/homework", homeworkHandler.List)
-	protected.GET("/homework/:id", homeworkHandler.Get)
-	protected.GET("/homework/:id/audio/:studentId", homeworkHandler.Audio)
+	schoolUsers.GET("/groups", groupHandler.List)
+	schoolUsers.GET("/groups/:id", groupHandler.GetByID)
+	schoolUsers.GET("/groups/:id/journal", groupHandler.GetJournal)
+	schoolUsers.GET("/lessons/:id", lessonHandler.GetByID)
+	schoolUsers.GET("/homework", homeworkHandler.List)
+	schoolUsers.GET("/homework/:id", homeworkHandler.Get)
+	schoolUsers.GET("/homework/:id/audio/:studentId", homeworkHandler.Audio)
 
 	teacherOnly := protected.Group("/")
 	teacherOnly.Use(middleware.RequireRoles("teacher"))
